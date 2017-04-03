@@ -1,8 +1,5 @@
 #include <iostream>
-#include <map>
-#include <unordered_set>
 #include <vector>
-#include <queue>
 
 using namespace std;
 
@@ -47,25 +44,11 @@ class LogOp: public QueryOp {
 					puts("About to perform set union");
 					sort(childResult.begin(), childResult.end());
 					sort(oldResult.begin(), oldResult.end());
-/*
-					//sort(result.begin(), result.end());
-					printf("Current sets passed into union:\n");
-					for (vector<int>::iterator it2 = childResult.begin(); it2 < childResult.end(); it2 ++) {
-						printf("%d; ", *it2);
-					}
-					printf("\n");
-					//for (vector<int>::iterator it2 = result.begin(); it2 < resultIt; it2 ++) {
-					for (vector<int>::iterator it2 = oldResult.begin(); it2 < oldResult.end(); it2 ++) {
-						printf("%d; ", *it2);
-					}
-					printf("\n");
-					//resultIt = set_union(childResult.begin(), childResult.end(), result.begin(), resultIt, resultIt);//result.begin());
-					//resultIt = set_union(childResult.begin(), childResult.end(), result.begin(), resultIt, result.begin());//result.begin());
-*/					resultIt = set_union(childResult.begin(), childResult.end(), oldResult.begin(), oldResult.end(), result.begin());//result.begin());
+					resultIt = set_union(childResult.begin(), childResult.end(), oldResult.begin(), oldResult.end(), result.begin());//result.begin());
 					printf("Difference in iterators: %lu\n", resultIt - result.begin());
 					oldResult = vector<int>(result.begin(), resultIt); // Can avoid this copying? Otherwise result seems to be wrong :(
+						// TO-DO : Refactor with std::swap of pointers instead?
 				}
-				//return vector<int>(result.begin(), resultIt);
 				return oldResult;
 			}
 			
@@ -109,7 +92,6 @@ class RelOp: public QueryOp {
 				printf("%d, ", *it);
 			}
 			return result;
-			//return NULL;
 		}
 		RelOp(int queryFieldId, int relation, int value) {
 			this->queryFieldId = queryFieldId;
@@ -124,7 +106,7 @@ int main() {
 	RelOp r1 = RelOp(0, 1, 6);
 	RelOp r2 = RelOp(0, -1, 10);
 	vector<int> test = {2, 3, 6, 8, 10, 11};
-	vector<QueryOp*> testVector = {&r1, &r2};//vector<QueryOp*>(&r1, &r2);
+	vector<QueryOp*> testVector = {&r1, &r2};
 	LogOp l1 = LogOp(0, &testVector);
 	LogOp l2 = LogOp(1, &testVector);
 	vector <int> result1 = l1.processOp(test);

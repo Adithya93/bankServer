@@ -95,6 +95,7 @@ bool transfer(unsigned long fromAccount, unsigned long toAccount, float amount, 
     return true;
 }
 
+/*
 // for queries
 unordered_set<tuple<unsigned long, unsigned long, float, vector<string>*>*> processORQuery(unordered_set<tuple<unsigned long, unsigned long, float, vector<string>*>*> querySet, vector<>) {
 
@@ -106,7 +107,7 @@ unordered_set<tuple<unsigned long, unsigned long, float, vector<string>*>*> proc
 
     return NULL;
 }
-
+*/
 
 
 
@@ -187,6 +188,7 @@ int main (int argc, char* args[]) {
                 const XMLCh* accountVal = child->getAttributes()->getNamedItem(XMLString::transcode("ref"))->getTextContent();
                 wprintf(L"Ref: %s\n", XMLString::transcode(accountVal));
                 DOMNodeList* grandchildren = child->getChildNodes();
+                
                 for (int j = 0; j < grandchildren->getLength(); j ++) {
                     DOMNode* infoNode = grandchildren->item(j);
                     const char * nodeName = XMLString::transcode(infoNode->getNodeName());
