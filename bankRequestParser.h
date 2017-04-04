@@ -8,7 +8,6 @@
 #include <vector>
 
 using namespace xercesc;
-//using namespace std;
 
 class bankRequestParser {
     public:
@@ -24,16 +23,15 @@ class bankRequestParser {
 
         int parseCreateReqs(); 
 
-
         int parseBalanceReqs();
 
         int parseTransferReqs();
 
-        std::vector<std::tuple<unsigned long, float, bool, std::string>*>* getCreateReqs();
+        std::vector<std::tuple<unsigned long, float, bool, std::string>> getCreateReqs();
 
-        std::vector<std::tuple<unsigned long, std::string>*>* getBalanceReqs();
+        std::vector<std::tuple<unsigned long, std::string>> getBalanceReqs();
 
-        std::vector<std::tuple<unsigned long, unsigned long, float, std::string>*>* getTransferReqs();
+        std::vector<std::tuple<unsigned long, unsigned long, float, std::string>> getTransferReqs();
 
         bool hasReset();
 
@@ -41,9 +39,9 @@ class bankRequestParser {
 
 
     private:
-      std::vector<std::tuple<unsigned long, float, bool, std::string>*>* createReqs;
-      std::vector<std::tuple<unsigned long, std::string>*>*  balanceReqs;
-      std::vector<std::tuple<unsigned long, unsigned long, float, std::string>*>* transferReqs;
+      std::vector<std::tuple<unsigned long, float, bool, std::string>> createReqs;
+      std::vector<std::tuple<unsigned long, std::string>>  balanceReqs;
+      std::vector<std::tuple<unsigned long, unsigned long, float, std::string>> transferReqs;
       bool reset;
       DOMElement* root;
 

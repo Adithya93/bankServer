@@ -11,6 +11,7 @@
 #include <xercesc/util/PlatformUtils.hpp>
 #include <stdint.h>
 #include "./bankRequestParser.h"
+#include "./bankBackend.h"
 
 
 //using namespace std;
@@ -117,6 +118,7 @@ void writeBadRequest(int connfd) {
 	}
 }
 
+
 int main() {
 	std::cout << "Booyakasha C++!\n";
 	int listenFd = bindAndListen(8000, 10);
@@ -129,11 +131,13 @@ int main() {
     }
     catch (const XMLException& toCatch) {
         char* message = XMLString::transcode(toCatch.getMessage());
-        std::cout << "Error during initialization! :\n"
-             << message << "\n";
+        std::cout << "Error during initialization of parser! :\n" << message << "\n";
         XMLString::release(&message);
-        return 1;
+        close(listenFd);
+        exit(1);
+        //return 1;
     }
+    bankBackend* backend = new bankBackend(); 
 	while(1) {
 		if ((connfd = accept(listenFd, (struct sockaddr *)&cliaddr, &len)) == -1) {
 			perror("Unable to accept connection");
@@ -158,13 +162,28 @@ int main() {
 			    	// should return error xml
 			    	writeBadRequest(connfd);// TEMP
 			    }
-			    else {
+			    else { // creates, balances, transfers and queries for this request are all available now
+			    	/*
 				    std::vector<std::tuple<unsigned long, float, bool, std::string>*>* testCreates = test->getCreateReqs();
 				    for (std::vector<std::tuple<unsigned long, float, bool, std::string>*>::iterator it = testCreates->begin(); it < testCreates->end(); it ++ ) {
 				      std::tuple<unsigned long, float, bool, std::string> testCreate = **it;
 				      std::cout << "Account: " << std::get<0>(testCreate) << "; " << std::get<1>(testCreate) << "; " << std::get<2>(testCreate) << ";" << std::get<3>(testCreate) << "\n";
 				    }
-				    test->cleanUp();
+				    */
+				    std::vector<std::tuple<bool, std::string>> createResults = backend->createAccounts(test->getCreateReqs());
+				    std::vector<std::tuple<float, std::string>> balanceResults = backend->getBalances(test->getBalanceReqs());
+				    
+				    for (std::vector<std::tuple<bool, std::string>>::iterator it = createResults.begin(); it < createResults.end(); it ++) {
+				    	std::tuple<bool, std::string> createResult = *it;
+				    	std::cout << "Create Result: " << std::get<0>(createResult) << "; Ref: " << std::get<1>(createResult) << "\n";
+				    }
+
+				    for (std::vector<std::tuple<float, std::string>>::iterator it = balanceResults.begin(); it < balanceResults.end(); it ++) {
+				    	std::tuple<float, std::string> balanceResult = *it;
+				    	std::cout << "Balance Result: " << std::get<0>(balanceResult) << " Ref: " << std::get<1>(balanceResult) << "\n";
+				    }
+
+				    test->cleanUp(); // done with request, clean up all XMLParsing resources
 				}
 			    delete test;
 			}
@@ -174,6 +193,7 @@ int main() {
 			close(connfd);
 		}
 	}
+	close(listenFd);
 	XMLPlatformUtils::Terminate();
 	return 0;
 
