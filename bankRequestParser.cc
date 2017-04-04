@@ -9,17 +9,19 @@
 #include <unordered_set>
 #include <vector>
 #include <queue>
+#include "./bankRequestParser.h"
 
-using namespace std;
+//using namespace std;
 using namespace xercesc;
 
-class bankRequestParser {
+//class bankRequestParser {
+    /*
     public:
         XercesDOMParser* parser;
         MemBufInputSource* source;
         ErrorHandler* errHandler;
-
-        bankRequestParser(const char* requestBuffer, size_t requestSize) { // TO-DO : Refactor for better exception safety?
+    */
+        bankRequestParser::bankRequestParser(const char* requestBuffer, size_t requestSize) { // TO-DO : Refactor for better exception safety?
             parser = (XercesDOMParser*) new XercesDOMParser();
             parser->setValidationScheme(XercesDOMParser::Val_Always);
             parser->setDoNamespaces(true);    // optional
@@ -28,7 +30,7 @@ class bankRequestParser {
             source = (MemBufInputSource*) new MemBufInputSource((const XMLByte*)requestBuffer, (const XMLSize_t) requestSize, "test"); // TO-DO: Use threadId or some identifier as last arg
         }
 
-        int parseRequest() { 
+        int bankRequestParser::parseRequest() { 
             try {
                 //xmlDoc = parser->parse(*source);
                 parser->parse(*source);
@@ -38,46 +40,44 @@ class bankRequestParser {
                   cleanUp();
                   return -1;
                 }
-                if (parseCreateReqs()) cout << "Unable to parse create requests";
-                if (parseBalanceReqs()) cout << "Unable to parse balance requests";
-                if (parseTransferReqs()) cout << "Unable to parse transfer requests";
+                if (parseCreateReqs()) std::cout << "Unable to parse create requests";
+                if (parseBalanceReqs()) std::cout << "Unable to parse balance requests";
+                if (parseTransferReqs()) std::cout << "Unable to parse transfer requests";
                 return 0;
             }
 
             catch (const XMLException& toCatch) {
                 char* message = XMLString::transcode(toCatch.getMessage());
-                cout << "Exception message is: \n"
-                     << message << "\n";
+                std::cout << "Exception message is: \n" << message << "\n";
                 XMLString::release(&message);
                 cleanUp(); 
                 return -1;
             }
             catch (const DOMException& toCatch) {
                 char* message = XMLString::transcode(toCatch.msg);
-                cout << "Exception message is: \n"
-                     << message << "\n";
+                std::cout << "Exception message is: \n" << message << "\n";
                 XMLString::release(&message);
                 cleanUp();
                 return -1;
             }
             catch (...) {
-                cout << "Unexpected Exception \n" ;
+                std::cout << "Unexpected Exception \n" ;
                 cleanUp();
                 return -1;
             }
 
         }
 
-        int testValidity() {
+        int bankRequestParser::testValidity() {
           DOMDocument* xmlDoc = parser->getDocument();
           if (!xmlDoc) {
-            cout << "Unable to open document!\n";
+            std::cout << "Unable to open document!\n";
             return -1;
           }
           else {
             root = xmlDoc->getDocumentElement();
             if (!root) {
-              cout << "Empty document!\n";
+              std::cout << "Empty document!\n";
               return -1;
             }
             const XMLCh* rootTagName = root->getTagName();
@@ -104,25 +104,25 @@ class bankRequestParser {
           }
         }
 
-        int parseCreateReqs() {
+        int bankRequestParser::parseCreateReqs() {
           DOMNodeList* creations = root->getElementsByTagName(XMLString::transcode("create"));
           printf("No. of creations: %lu\n", creations->getLength());
           //iterate through DOMNodes
-          vector<tuple<unsigned long, float, bool, string>*>* createReqsVec = new vector<tuple<unsigned long, float, bool, string>*>(); // exception-safety? :(
+          std::vector<std::tuple<unsigned long, float, bool, std::string>*>* createReqsVec = new std::vector<std::tuple<unsigned long, float, bool, std::string>*>(); // exception-safety? :(
           //vector<tuple<unsigned long, float, bool, string>> createReqsVec;
-          tuple<unsigned long, float, bool, string>* createReq;
+          std::tuple<unsigned long, float, bool, std::string>* createReq;
           for (int i = 0; i < creations->getLength(); i ++) {
 
               unsigned long account = 0;
               float balance = 0;
-              string ref;
+              std::string ref;
 
               DOMNode* child = creations->item(i);
               const XMLCh* nodeText = child->getTextContent();
               wprintf(L"Node value: %s\n", nodeText);
               const XMLCh* refXML = child->getAttributes()->getNamedItem(XMLString::transcode("ref"))->getTextContent();
               ref = XMLString::transcode(refXML);
-              cout << "Ref: " << ref << "\n";
+              std::cout << "Ref: " << ref << "\n";
               DOMNodeList* grandchildren = child->getChildNodes();
               for (int j = 0; j < grandchildren->getLength(); j ++) {
                   DOMNode* infoNode = grandchildren->item(j);
@@ -138,15 +138,15 @@ class bankRequestParser {
                   else if (strcmp(nodeName, "balance") == 0) {
                       printf("Balance Found. %s : %s\n", nodeName, nodeValue);
                       try {
-                        balance = stof(nodeValue);
+                        balance = std::stof(nodeValue);
                       }
-                      catch (const invalid_argument& ia) {
-                        cerr << "Invalid formatting of balance in create request: " << ia.what() << "\n";
+                      catch (const std::invalid_argument& ia) {
+                        std::cerr << "Invalid formatting of balance in create request: " << ia.what() << "\n";
                         // continue processing other creates in this request instead of returning error
                       }
                   } 
               }
-              createReqsVec->push_back(new tuple<unsigned long, float, bool, string>(account, balance, reset, ref));
+              createReqsVec->push_back(new std::tuple<unsigned long, float, bool, std::string>(account, balance, reset, ref));
               printf("Done with creation %d\n", i);
           }
           createReqs = createReqsVec;
@@ -154,50 +154,52 @@ class bankRequestParser {
         }
 
 
-        int parseBalanceReqs() {
+        int bankRequestParser::parseBalanceReqs() {
           return 0;
         }
 
-        int parseTransferReqs() {
+        int bankRequestParser::parseTransferReqs() {
           return 0;
         }
 
-        vector<tuple<unsigned long, float, bool, string>*>* getCreateReqs() {
+        std::vector<std::tuple<unsigned long, float, bool, std::string>*>* bankRequestParser::getCreateReqs() {
           return createReqs;
         }
 
-        vector<tuple<unsigned long, string>*>* getBalanceReqs() {
+        std::vector<std::tuple<unsigned long, std::string>*>* bankRequestParser::getBalanceReqs() {
           return balanceReqs;
         }
 
-        vector<tuple<unsigned long, unsigned long, float, string>*>* getTransferReqs() {
+        std::vector<std::tuple<unsigned long, unsigned long, float, std::string>*>* bankRequestParser::getTransferReqs() {
           return transferReqs;
         }
 
-        bool hasReset() {
+        bool bankRequestParser::hasReset() {
           return reset;
         }
 
-        void cleanUp() {
+        void bankRequestParser::cleanUp() {
             delete parser;
             delete errHandler;
             delete source;
         }
 
 
-    private:
-      vector<tuple<unsigned long, float, bool, string>*>* createReqs;
-      vector<tuple<unsigned long, string>*>*  balanceReqs;
-      vector<tuple<unsigned long, unsigned long, float, string>*>* transferReqs;
+    //private:
+      /*
+      std::vector<std::tuple<unsigned long, float, bool, std::string>*>* createReqs;
+      std::vector<std::tuple<unsigned long, std::string>*>*  balanceReqs;
+      std::vector<std::tuple<unsigned long, unsigned long, float, std::string>*>* transferReqs;
       bool reset;
       DOMElement* root;
+      */
 
-};
-
-
-
+//};
 
 
+
+
+/*
 int main (int argc, char* args[]) {
     try {
         XMLPlatformUtils::Initialize();
@@ -270,4 +272,5 @@ int main (int argc, char* args[]) {
     XMLPlatformUtils::Terminate();
     return 0;
 }
+*/
           
