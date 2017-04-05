@@ -31,7 +31,8 @@ class bankRequestParser {
 
         std::vector<std::tuple<unsigned long, std::string>> getBalanceReqs();
 
-        std::vector<std::tuple<unsigned long, unsigned long, float, std::string>> getTransferReqs();
+        //std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<string>*>*>* getTransferReqs(); // can use instead of below line if txn cache is activated
+        std::vector<std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>> getTransferReqs();
 
         bool hasReset();
 
@@ -41,7 +42,7 @@ class bankRequestParser {
     private:
       std::vector<std::tuple<unsigned long, float, bool, std::string>> createReqs;
       std::vector<std::tuple<unsigned long, std::string>>  balanceReqs;
-      std::vector<std::tuple<unsigned long, unsigned long, float, std::string>> transferReqs;
+      std::vector<std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>> transferReqs;
       bool reset;
       DOMElement* root;
 

@@ -182,6 +182,64 @@ using namespace xercesc;
   }
 
   int bankRequestParser::parseTransferReqs() {
+    DOMNodeList* transfers = root->getElementsByTagName(XMLString::transcode("transfer"));
+    printf("No. of transfers: %lu\n", transfers->getLength());
+    //iterate through DOMNodes
+    //std::vector<std::tuple<unsigned long, float, bool, std::string>*>* createReqsVec;// = new std::vector<std::tuple<unsigned long, float, bool, std::string>*>(); // exception-safety? :(
+    std::vector<std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>> transferReqsVec;
+    //std::tuple<unsigned long, float, bool, std::string> createReq;
+    for (int i = 0; i < transfers->getLength(); i ++) {
+
+        unsigned long fromAccount = 0;
+        unsigned long toAccount = 0;
+        float amount = 0;
+        std::string ref;
+        std::vector<std::string> tags;
+
+        DOMNode* child = transfers->item(i);
+        const XMLCh* nodeText = child->getTextContent();
+        wprintf(L"Node value: %s\n", nodeText);
+        const XMLCh* refXML = child->getAttributes()->getNamedItem(XMLString::transcode("ref"))->getTextContent();
+        ref = XMLString::transcode(refXML);
+        std::cout << "Ref: " << ref << "\n";
+        DOMNodeList* grandchildren = child->getChildNodes();
+        for (int j = 0; j < grandchildren->getLength(); j ++) {
+            DOMNode* infoNode = grandchildren->item(j);
+            const char * nodeName = XMLString::transcode(infoNode->getNodeName());
+            const char * nodeValue = XMLString::transcode(infoNode->getTextContent());
+            if (strcmp(nodeName, "from") == 0) {
+                printf("fromAccount Found. %s : %s\n", nodeName, nodeValue);
+                if (!(fromAccount = strtoul(nodeValue, NULL, 10))) { // strtoul returns 0, invalid formatting of account num
+                  printf("Invalid formatting of account number in transfer request: %s\n", nodeValue);
+                  // continue processing other creates in this request instead of returning error
+                }
+            }
+            else if (strcmp(nodeName, "to") == 0) {
+                printf("toAccount Found. %s : %s\n", nodeName, nodeValue);
+                if (!(toAccount = strtoul(nodeValue, NULL, 10))) { // strtoul returns 0, invalid formatting of account num
+                  printf("Invalid formatting of account number in transfer request: %s\n", nodeValue);
+                  // continue processing other creates in this request instead of returning error
+                }
+            }
+            else if (strcmp(nodeName, "amount") == 0) {
+                printf("Amount Found. %s : %s\n", nodeName, nodeValue);
+                try {
+                  amount = std::stof(nodeValue);
+                }
+                catch (const std::invalid_argument& ia) {
+                  std::cerr << "Invalid formatting of balance in transfer request: " << ia.what() << "\n";
+                  // continue processing other creates in this request instead of returning error
+                }
+            }
+            else if (strcmp(nodeName, "tag") == 0) {
+              printf("Tag found. %s : %s\n", nodeName, nodeValue);
+              tags.push_back(std::string(nodeValue));
+            } 
+        }
+        transferReqsVec.push_back(std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>(fromAccount, toAccount, amount, ref, tags));
+        printf("Done with transfer %d\n", i);
+    }
+    transferReqs = transferReqsVec;
     return 0;
   }
 
@@ -193,7 +251,8 @@ using namespace xercesc;
     return balanceReqs;
   }
 
-  std::vector<std::tuple<unsigned long, unsigned long, float, std::string>> bankRequestParser::getTransferReqs() {
+  //std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<string>*>*>* bankRequestParser::getTransferReqs() {
+  std::vector<std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>> bankRequestParser::getTransferReqs() {
     return transferReqs;
   }
 

@@ -4,6 +4,7 @@
 #include <vector>
 #include <queue>
 #include "./bankBackend.h"
+//#include "./bankDBHandler.h"
 
 //using namespace std;
 /*
@@ -12,7 +13,8 @@ std::unordered_set<std::tuple<unsigned long, unsigned long, float, std::vector<s
 */
 bankBackend::bankBackend() {
     cache = new std::map<unsigned long, float>(); // cache of account num to balance key-value pairs, for quick create, balance and transfer requests
-    transactions = new std::unordered_set<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>*>*>();
+    //transactions = new std::unordered_set<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>*>*>();
+    dbHandler = new bankDBHandler();
 }
 
 
@@ -22,44 +24,72 @@ std::map<unsigned long, float>::iterator bankBackend::findAccount(unsigned long 
 
 // for balance queries
 float bankBackend::getBalance(unsigned long account) {
-    std::map<unsigned long, float>::iterator it = findAccount(account);//cache->find(account);
-    if (it != cache->end()) {
-        float foundBalance = it->second;
+    // if in cache, return cached value
+    float foundBalance;
+    std::map<unsigned long, float>::iterator it = findAccount(account);
+    if (it != cache->end()) { // in cache
+        foundBalance = it->second;
         printf("Current balance of account %lu : %f\n", account, foundBalance);
         return foundBalance;
     }
+    // not in cache, check DB
+    // TO-DO : will eventually use DB threadpool
     printf("Account %lu not in cache\n", account);
-    return -1;
+    pqxx::result getBalanceResult = dbHandler->getBalance(account);
+    if (getBalanceResult.size() == 0 || getBalanceResult[0]["balance"].is_null()) { // not in DB either, must be non-existent account
+        return -1;
+    }
+    if (!getBalanceResult[0]["balance"].to(foundBalance)) return - 1;
+    return foundBalance;
 }
 
 // for creating/resetting accounts and transfers
 bool bankBackend::setBalance(unsigned long account, float balance, bool reset) {
     std::map<unsigned long, float>::iterator it = findAccount(account);
-    if (it == cache->end()) { // creating new account
-        std::pair<std::map<unsigned long, float>::iterator, bool> inserted = cache->insert(std::pair<unsigned long, float>(account, balance));
-        printf("Created new account %lu with balance %f\n", inserted.first->first, inserted.first->second);
-        return true;
-    }
-    else if (!reset) { // account already exists and not a reset, do not update
-        printf("Account %lu already exists, ignoring\n", account);
-        return false;
-    }
-    else {     // updating existing account's balance
+    if (it != cache->end()) { // account exists
+        if (!reset) { // account already exists and not a reset, do not update
+            printf("Account %lu already exists, ignoring\n", account);
+            return false;
+        }
+        // updating existing account's balance; update DB and write to cache to speed up future reads ('balance' requests)
         it->second = balance;
         printf("Overwrote account %lu's balance to %f\n", it->first, it->second);
-        return true;
+        // Write-through to database after this
     }
+    
+    else { // new account; update DB and write to cache to speed up future reads ('balance' requests)     
+        std::pair<std::map<unsigned long, float>::iterator, bool> inserted = cache->insert(std::pair<unsigned long, float>(account, balance));
+        printf("Created new account %lu with balance %f\n", inserted.first->first, inserted.first->second);
+        // Write-through to database after this
+    }
+    int commitSuccess = 0;
+    pqxx::result setBalanceResult = dbHandler->saveAccount(account, balance, reset, &commitSuccess);
+    if (!commitSuccess) { // writing to DB failed
+        // TO-DO : Retry?
+        return false; // unable to commit to DB, return error to client
+    }
+    return true; // successfully committed to DB
+}
+
+
+
+
+// for transfers
+//void bankBackend::saveTransfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string>* tags) {
+bool bankBackend::saveTransfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags) {
+    //std::tuple<unsigned long, unsigned long, float, std::vector<std::string>*>* transTup = new std::tuple<unsigned long, unsigned long, float, std::vector<std::string>*>(fromAccount, toAccount, amount, tags);
+    std::tuple<unsigned long, unsigned long, float, std::vector<std::string>> transTup(fromAccount, toAccount, amount, tags);
+    //transactions->insert(transTup);
+    // TO-DO: save to DB
+    int transferSuccess = 0;
+    pqxx::result transferResult = dbHandler->transfer(fromAccount, toAccount, amount, tags, &transferSuccess);
+    return transferSuccess == 1;
 }
 
 // for transfers
-void bankBackend::saveTransfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string>* tags) {
-    std::tuple<unsigned long, unsigned long, float, std::vector<std::string>*>* transTup = new std::tuple<unsigned long, unsigned long, float, std::vector<std::string>*>(fromAccount, toAccount, amount, tags);
-    transactions->insert(transTup);
-    return;
-}
-
-// for transfers
-bool bankBackend::transfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string>* tags) {
+//bool bankBackend::transfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string>* tags) {
+bool bankBackend::transfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags) {
+    /* NO POINT CHECKING IN CACHE FOR THIS
     unsigned long from;
     unsigned long to;
     if (amount > 0) {
@@ -87,8 +117,9 @@ bool bankBackend::transfer(unsigned long fromAccount, unsigned long toAccount, f
     }
     setBalance(from, fromIt->second - amount, true);
     setBalance(to, toIt->second + amount, true);
-    saveTransfer(fromAccount, toAccount, amount, tags);
-    return true;
+    */
+    return saveTransfer(fromAccount, toAccount, amount, tags); // write to DB
+    //return true;
 }
 
 // Since this is per-request state, it does not need persistence, hence object returned instead of allocated pointer, to facilitate exception safety
@@ -102,13 +133,24 @@ std::vector<std::tuple<bool, std::string>> bankBackend::createAccounts(std::vect
     return resultVec;
 }
 
-// Same as above
+// Same as above, for all balances in a request
 std::vector<std::tuple<float, std::string>> bankBackend::getBalances(std::vector<std::tuple<unsigned long, std::string>>  balanceReqs) {
     std::vector<std::tuple<float, std::string>> resultVec;
     for (std::vector<std::tuple<unsigned long, std::string>>::iterator it = balanceReqs.begin(); it < balanceReqs.end(); it ++) {
         std::tuple<unsigned long, std::string> reqTuple = *it;
         float balanceResult = getBalance(std::get<0>(reqTuple));
         resultVec.push_back(std::tuple<float, std::string>(balanceResult, std::get<1>(reqTuple)));
+    }
+    return resultVec;
+}
+
+// Same as above, for all transfers in a request
+std::vector<std::tuple<bool, std::string>> bankBackend::doTransfers(std::vector<std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>> transferReqs) {
+    std::vector<std::tuple<bool, std::string>> resultVec;
+    for (std::vector<std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>>::iterator it = transferReqs.begin(); it < transferReqs.end(); it ++ ) {
+        std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>> reqTuple = *it;
+        bool transferResult = transfer(std::get<0>(reqTuple), std::get<1>(reqTuple), std::get<2>(reqTuple), std::get<4>(reqTuple));
+        resultVec.push_back(std::tuple<bool, std::string>(transferResult, std::get<3>(reqTuple)));
     }
     return resultVec;
 }
@@ -126,46 +168,3 @@ unordered_set<tuple<unsigned long, unsigned long, float, vector<string>*>*> proc
     return NULL;
 }
 */
-
-
-/*
-int main (int argc, char* args[]) {
-    
-    try {
-        XMLPlatformUtils::Initialize();
-    }
-    catch (const XMLException& toCatch) {
-        char* message = XMLString::transcode(toCatch.getMessage());
-        cout << "Error during initialization! :\n"
-             << message << "\n";
-        XMLString::release(&message);
-        return 1;
-    }
-
-    cache = new map<unsigned long, float>();
-    transactions = new unordered_set<tuple<unsigned long, unsigned long, float, vector<string>*>*>();
-    
-    getBalance(1);
-    setBalance(1, 5, false);
-    getBalance(1);
-    setBalance(1, 10, true);
-    getBalance(1);
-    setBalance(2, 20, false);
-    setBalance(2, 30, false);
-    getBalance(2);
-    transfer(3, 1, 5, NULL);
-    transfer(1, 3, 5, NULL);
-    transfer(1, 2, 15, NULL);
-    transfer(2, 1, -15, NULL);
-    transfer(1, 2, 0, NULL);
-    transfer(1, 2, 5, NULL);
-    getBalance(1);
-    getBalance(2);
-
-
-    delete cache;
-    return 0;
-}
-*/
-
-          

@@ -172,7 +172,7 @@ int main() {
 				    */
 				    std::vector<std::tuple<bool, std::string>> createResults = backend->createAccounts(test->getCreateReqs());
 				    std::vector<std::tuple<float, std::string>> balanceResults = backend->getBalances(test->getBalanceReqs());
-				    
+				    std::vector<std::tuple<bool, std::string>> transferResults = backend->doTransfers(test->getTransferReqs());
 				    for (std::vector<std::tuple<bool, std::string>>::iterator it = createResults.begin(); it < createResults.end(); it ++) {
 				    	std::tuple<bool, std::string> createResult = *it;
 				    	std::cout << "Create Result: " << std::get<0>(createResult) << "; Ref: " << std::get<1>(createResult) << "\n";
@@ -181,6 +181,11 @@ int main() {
 				    for (std::vector<std::tuple<float, std::string>>::iterator it = balanceResults.begin(); it < balanceResults.end(); it ++) {
 				    	std::tuple<float, std::string> balanceResult = *it;
 				    	std::cout << "Balance Result: " << std::get<0>(balanceResult) << " Ref: " << std::get<1>(balanceResult) << "\n";
+				    }
+
+				    for (std::vector<std::tuple<bool, std::string>>::iterator it = transferResults.begin(); it < transferResults.end(); it ++) {
+				    	std::tuple<bool, std::string> transferResult = *it;
+				    	std::cout << "Transfer Result: " << std::get<0>(transferResult) << "; Ref: " << std::get<1>(transferResult) << "\n";
 				    }
 
 				    test->cleanUp(); // done with request, clean up all XMLParsing resources
