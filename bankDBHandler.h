@@ -16,9 +16,16 @@ class bankDBHandler {
     pqxx::result getBalance(unsigned long account);
 
     // Update accounts in database
-    pqxx::result transfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags, int * result);
+    std::tuple<unsigned long, float, unsigned long, float> transfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags, int * result);
+
 
   private:
     pqxx::result updateBalance(unsigned long account, float balance, int * result);
+
+    pqxx::result updateBalances(unsigned long fromAccount, float fromBalanceNew, unsigned long toAccount, float toBalanceNew, int* success); 
+
+    pqxx::result saveTags(unsigned long transferID, std::vector<std::string> tags, int* success);
+
+    pqxx::result saveTxn(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags, int* success);
   
 };

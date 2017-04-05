@@ -1,3 +1,4 @@
 invalidated cache
 insufficient handling of malformed xml
 test client not scalable enough to assess server's scalability
+Failure to check number of tags against SQL multiple-insert limit of 1000, leading to missing tags for transfers

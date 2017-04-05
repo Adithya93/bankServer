@@ -78,11 +78,14 @@ bool bankBackend::setBalance(unsigned long account, float balance, bool reset) {
 //void bankBackend::saveTransfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string>* tags) {
 bool bankBackend::saveTransfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags) {
     //std::tuple<unsigned long, unsigned long, float, std::vector<std::string>*>* transTup = new std::tuple<unsigned long, unsigned long, float, std::vector<std::string>*>(fromAccount, toAccount, amount, tags);
-    std::tuple<unsigned long, unsigned long, float, std::vector<std::string>> transTup(fromAccount, toAccount, amount, tags);
-    //transactions->insert(transTup);
-    // TO-DO: save to DB
+    //std::tuple<unsigned long, unsigned long, float, std::vector<std::string>> transTup(fromAccount, toAccount, amount, tags); 
     int transferSuccess = 0;
-    pqxx::result transferResult = dbHandler->transfer(fromAccount, toAccount, amount, tags, &transferSuccess);
+    std::tuple<unsigned long, float, unsigned long, float> newBalances = dbHandler->transfer(fromAccount, toAccount, amount, tags, &transferSuccess);
+    if (transferSuccess) { // update cache
+        cache->insert(std::pair<unsigned long, float>(std::get<0>(newBalances), std::get<1>(newBalances)));
+        cache->insert(std::pair<unsigned long, float>(std::get<2>(newBalances), std::get<3>(newBalances)));
+    }
+    // transfer failed, so cache is still valid
     return transferSuccess == 1;
 }
 

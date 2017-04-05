@@ -34,17 +34,6 @@ pqxx::result bankDBHandler::getBalance(unsigned long account) {
     std::cout << "Null result\n";
     return r;
   }
-  /*
-  for (auto row: r)
-    std::cout
-      // Address column by name.  Use c_str() to get C-style string.
-      << "Account no. "
-      << row["id"].c_str()
-      << " has "
-      << row["balance"].as<int>()
-      << "."
-      << std::endl;
-  */
   std::cout << "About to commit txn!\n";
   // Not needed for SELECT queries, but just a practice
   txn.commit();
@@ -94,21 +83,94 @@ pqxx::result bankDBHandler::saveAccount(unsigned long account, float balance, bo
 
 }
 
+
+pqxx::result bankDBHandler::updateBalances(unsigned long fromAccount, float fromBalanceNew, unsigned long toAccount, float toBalanceNew, int* success) {
+  pqxx::connection c{"dbname=bankServer user=radithya"};
+  pqxx::work txn{c};
+  // From
+  std::string queryStringFrom("UPDATE accounts SET balance = " + std::to_string(fromBalanceNew) + " WHERE id = " + std::to_string(fromAccount));
+  std::cout << "Updating balance of account no. " << fromAccount;
+  std::cout << "Query String: " << queryStringFrom << "\n";
+  pqxx::result rFrom = txn.exec(queryStringFrom);
+  // To
+  std::string queryStringTo("UPDATE accounts SET balance = " + std::to_string(toBalanceNew) + " WHERE id = " + std::to_string(toAccount));
+  std::cout << "Updating balance of account no. " << toAccount;
+  std::cout << "Query String: " << queryStringTo << "\n";
+  pqxx::result rTo = txn.exec(queryStringTo);
+  std::cout << "About to commit txn!\n";
+  txn.commit();
+  *success = 1; // Set success flag for caller
+  std::cout << "Txn committed!\n";
+  return rTo;
+}
+
+
+/* NEED TO MAKE SAVING OX TXN AND SAVING OF TAG ATOMIC!
+// INSERTING MULTIPLE VALUES IN 1 INSERT QUERY IS FASTER THAN RUNNING MULTIPLE SINGLE-VALUE INSERT QUERIES
+// NOTE : LIMIT OF 1000 VALUES IN A SINGLE INSERT
+pqxx::result bankDBHandler::saveTags(unsigned long transferID, std::vector<std::string> tags, int* success) {
+  pqxx::connection c{"dbname=bankServer user=radithya"};
+  pqxx::work txn{c};
+
+  std::string queryString("INSERT INTO tags (tag, txnID) VALUES\n");
+  std::string transferIDStr = std::to_string(transferID);
+  for (std::vector<string>::iterator it = tags.begin(); it < tags.end() - 1; it ++) {
+    std::string tag = *it;
+    queryString.append("(" + tag + ", " + transferIDStr + "), ");
+  }
+  queryString.append("(" + *(tags.end() - 1) + ", " + transferIDStr + ")");
+  std::cout << "Query string:\n" << queryString << "\n";
+  pqxx::result r = txn.exec(queryString);
+  std::cout << "About to commit txn!\n";
+  txn.commit();
+  *success = 1; // Set success flag for caller
+  std::cout << "Txn committed!\n";
+
+  return r;
+}
+
+
+pqxx::result bankDBHandler::saveTxn(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags, int* success) {
+  pqxx::connection c{"dbname=bankServer user=radithya"};
+  pqxx::work txn{c};
+
+  std::string queryString("INSERT INTO txns (f, t, a) VALUES\n(" + std::to_string(fromAccount) + ", " + std::to_string(toAccount) + ", " + std::to_string(amount) + ")");
+  std::cout << "Query string:\n" << queryString << "\n";
+  pqxx::result r = txn.exec(queryString);
+  std::cout << "About to commit txn!\n";
+  
+  // Save Tags, if any
+  if (tags.size() > 0) {
+    return saveTags();
+  }
+  else {
+    std::cout << "No tags to save for this transfer\n";
+  }
+
+  txn.commit();
+  *success = 1; // Set success flag for caller
+  std::cout << "Txn committed!\n";
+  return r;
+}
+*/
+
 // Validation done beforehand
 // TO-DO : MUST RETURN LATEST BALANCES OF BOTH ACCOUNTS (whether success or failure) SO THAT BANK BACKEND CAN UPDATE ITS CACHE!!! ELSE CACHE INVALIDATED!
-pqxx::result bankDBHandler::transfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags, int* success) {
+std::tuple<unsigned long, float, unsigned long, float> bankDBHandler::transfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags, int* success) {
   // getBalance of fromAccount --> fromBalance; if not exists, *result = 0; return failure
   pqxx::result fromAccountResult = getBalance(fromAccount);
   if (fromAccountResult.size() == 0) { // fromAccount does not exist
     *success = 0; // fail
     std::cout << "FROM account of transfer does not exist, aborting\n";
-    return fromAccountResult;
+    return std::tuple<unsigned long, float, unsigned long, float>(0, 0, 0, 0); // value will be ignored
+    //return fromAccountResult;
   }
   float fromBalance;
   if (fromAccountResult[0]["balance"].is_null() || !fromAccountResult[0]["balance"].to(fromBalance)) { // unable to extract float balance
     *success = 0; // fail
     // TO-DO : Must log this as error as it represents server logic failure
-    return fromAccountResult;
+    //return fromAccountResult;
+    return std::tuple<unsigned long, float, unsigned long, float>(0, 0, 0, 0); // value will be ignored
   }
 
   // getBalance of toAccount --> toBalance; if not exists, *result = 0; return failure
@@ -116,40 +178,55 @@ pqxx::result bankDBHandler::transfer(unsigned long fromAccount, unsigned long to
   if (toAccountResult.size() == 0) { // toAccount does not exist
     *success = 0; // fail
     std::cout << "TO account of transfer does not exist, aborting\n";
-    return toAccountResult;
+    return std::tuple<unsigned long, float, unsigned long, float>(0, 0, 0, 0); // value will be ignored
+    //return toAccountResult;
   }
   float toBalance;
   if (toAccountResult[0]["balance"].is_null() || !toAccountResult[0]["balance"].to(toBalance)) { // unable to extract float balance
     *success = 0; // fail
     // TO-DO : Must log this as error as it represents server logic failure
-    return toAccountResult;
+    return std::tuple<unsigned long, float, unsigned long, float>(0, 0, 0, 0); // value will be ignored
+    //return toAccountResult;
   }
 
   // verify (fromBalance - amount) > 0 && (toBalance + amount) > 0 ; else return failure
   if ((fromBalance - amount < 0) || (toBalance + amount < 0)) { // insufficient funds
     std::cout << "Insufficient funds for transfer, aborting\n";
     *success = 0; // fail
-    return toAccountResult;
+    return std::tuple<unsigned long, float, unsigned long, float>(0, 0, 0, 0); // value will be ignored
+    //return toAccountResult;
   }
 
-  // updateAccount of fromAccount with fromBalance - amount ; if failure return failure
+  // atomically update both from and to accounts
   int updateSuccess = 0;
-  pqxx::result updateResult = updateBalance(fromAccount, fromBalance - amount, &updateSuccess);
+  pqxx::result updateResult = updateBalances(fromAccount, fromBalance - amount, toAccount, toBalance + amount, &updateSuccess);
   if (!updateSuccess) {
-    std::cout << "Unable to deduct amount from sender of transfer, aborting\n";
+    std::cout << "Unable to transfer, aborting\n";
     *success = 0; // fail
-    return updateResult;
+    return std::tuple<unsigned long, float, unsigned long, float>(0, 0, 0, 0); // value will be ignored
+    //return updateResult;
   }
 
+  /*
   // updateAccount of toAccount with toBalance + amount ; if failure return failure
   updateSuccess = 0;
   updateResult = updateBalance(toAccount, toBalance + amount, &updateSuccess);
   if (!updateSuccess) {
     std::cout << "Unable to add amount to recipient of transfer, aborting\n";
     *success = 0; // fail
-    return updateResult;
+    return std::tuple<unsigned long, float, unsigned long, float>(0, 0, 0, 0); // value will be ignored
+    //return updateResult;
   }
+  */
+
+  // NOTE : THIS TAKES THE RISK OF ACCOUNTS BEING SAVED WITHOUT TAGS.... IS THIS ALRIGHT? MAYBE CHANGE TO INCLUDE THIS IN ABOVE TXN TOO?
+  // Save to txn table
+  
+  // UNCOMMENT WHEN ATOMICITY RESTORED
+  //pqxx::result txnSaveResult = saveTxn(fromAccount, toAccount, amount, tags, success);
+  
   // return success
   *success = 1;
-  return updateResult;
+  return std::tuple<unsigned long, float, unsigned long, float>(fromAccount, fromBalance - amount, toAccount, toBalance + amount); // value will be written into cache
+  //return updateResult;
 }
