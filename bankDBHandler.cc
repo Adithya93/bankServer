@@ -1,5 +1,3 @@
-#include <iostream>
-#include <pqxx/pqxx>
 #include "./bankDBHandler.h"
 /* ADAPTED FROM/INSPIRED BY EXAMPLES AT PQXX.ORG*/
 
@@ -164,10 +162,6 @@ pqxx::result bankDBHandler::saveTxn(unsigned long fromAccount, unsigned long toA
     pqxx::result r = txn.exec(queryString);
     // TO-DO : Check result r of execution?
     std::cout << "About to commit txn!\n";
-    //txn.commit();
-    //*success = 1; // Set success flag for caller
-    //std::cout << "Txn committed!\n";
-    //return saveTags(txnID, tags, &txn, success);
   }
   else {
     std::cout << "No tags to save for this transfer\n";
@@ -186,14 +180,16 @@ std::tuple<unsigned long, float, unsigned long, float> bankDBHandler::transfer(u
   // getBalance of fromAccount --> fromBalance; if not exists, *result = 0; return failure
   pqxx::result fromAccountResult = getBalance(fromAccount);
   if (fromAccountResult.size() == 0) { // fromAccount does not exist
-    *success = 0; // fail
+    //*success = 0; // fail
+    *success = INVALID_ACCOUNT; // fail
     std::cout << "FROM account of transfer does not exist, aborting\n";
     return std::tuple<unsigned long, float, unsigned long, float>(0, 0, 0, 0); // value will be ignored
     //return fromAccountResult;
   }
   float fromBalance;
   if (fromAccountResult[0]["balance"].is_null() || !fromAccountResult[0]["balance"].to(fromBalance)) { // unable to extract float balance
-    *success = 0; // fail
+//  *success =0; //fail  
+    *success = INVALID_ACCOUNT; // fail
     // TO-DO : Must log this as error as it represents server logic failure
     //return fromAccountResult;
     return std::tuple<unsigned long, float, unsigned long, float>(0, 0, 0, 0); // value will be ignored
@@ -202,14 +198,16 @@ std::tuple<unsigned long, float, unsigned long, float> bankDBHandler::transfer(u
   // getBalance of toAccount --> toBalance; if not exists, *result = 0; return failure
   pqxx::result toAccountResult = getBalance(toAccount);
   if (toAccountResult.size() == 0) { // toAccount does not exist
-    *success = 0; // fail
+//    *success = 0; // fail
+    *success = INVALID_ACCOUNT; // fail
     std::cout << "TO account of transfer does not exist, aborting\n";
     return std::tuple<unsigned long, float, unsigned long, float>(0, 0, 0, 0); // value will be ignored
     //return toAccountResult;
   }
   float toBalance;
   if (toAccountResult[0]["balance"].is_null() || !toAccountResult[0]["balance"].to(toBalance)) { // unable to extract float balance
-    *success = 0; // fail
+    //*success = 0; // fail
+    *success = INVALID_ACCOUNT; // fail
     // TO-DO : Must log this as error as it represents server logic failure
     return std::tuple<unsigned long, float, unsigned long, float>(0, 0, 0, 0); // value will be ignored
     //return toAccountResult;
@@ -218,7 +216,8 @@ std::tuple<unsigned long, float, unsigned long, float> bankDBHandler::transfer(u
   // verify (fromBalance - amount) > 0 && (toBalance + amount) > 0 ; else return failure
   if ((fromBalance - amount < 0) || (toBalance + amount < 0)) { // insufficient funds
     std::cout << "Insufficient funds for transfer, aborting\n";
-    *success = 0; // fail
+//    *success = 0; // fail
+    *success = INSUFFICIENT_FUNDS; // fail
     return std::tuple<unsigned long, float, unsigned long, float>(0, 0, 0, 0); // value will be ignored
     //return toAccountResult;
   }
@@ -228,7 +227,8 @@ std::tuple<unsigned long, float, unsigned long, float> bankDBHandler::transfer(u
   pqxx::result updateResult = updateBalances(fromAccount, fromBalance - amount, toAccount, toBalance + amount, &updateSuccess);
   if (!updateSuccess) {
     std::cout << "Unable to transfer, aborting\n";
-    *success = 0; // fail
+//    *success = 0; // fail
+    *success = INSUFFICIENT_FUNDS; // fail
     return std::tuple<unsigned long, float, unsigned long, float>(0, 0, 0, 0); // value will be ignored
     //return updateResult;
   }

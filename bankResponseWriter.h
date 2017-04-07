@@ -10,7 +10,9 @@
 class bankResponseWriter {
 
 	public:
-		std::string parseErrorResponse();
+		bankResponseWriter();
+
+		std::string getParseErrorResponse();
 
 		std::string createSuccessResponse(std::string ref);
 
@@ -28,6 +30,16 @@ class bankResponseWriter {
 
 		std::string queryResponse(std::string ref, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>* queryResults);
 
-		std::string constructResponse(std::vector<std::tuple<bool, std::string>>* createResults, std::vector<std::tuple<float, std::string>>* balanceResults, std::vector<std::tuple<bool, std::string>>* transferResults, std::vector<std::tuple<std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>>* queryResults);
+		//std::string constructResponse(std::vector<std::tuple<bool, std::string>>* createResults, std::vector<std::tuple<float, std::string>>* balanceResults, std::vector<std::tuple<bool, std::string>>* transferResults, std::vector<std::tuple<std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>>* queryResults);
+		std::string constructResponse(std::vector<std::tuple<bool, std::string>>* createResults, std::vector<std::tuple<float, std::string>>* balanceResults, std::vector<std::tuple<int, std::string>>* transferResults, std::vector<std::tuple<std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>>* queryResults);
+		std::string hostToNetLong64(unsigned long hostLong);
+		std::string addHeaderString(std::string responseBody);
+
+	private:
+		std::string unparseableError;
+		float MIN_BALANCE = 0;
+		int TRANSFER_SUCCESS = 1;
+		int INSUFFICIENT_FUNDS = -1;
+		int INVALID_ACCOUNT = -2;
 				 
 };

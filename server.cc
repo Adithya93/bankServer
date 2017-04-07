@@ -57,7 +57,7 @@ unsigned long netToHostLong64(char * ptr) {
 //	std::cout << "MSB 4 bytes of document are " << docSizeMost4 << "\n";
 	unsigned int docSizeLeast4 = ntohl((uint32_t)*((int*)docSizePtr + 1));
 //	std::cout << "LSB 4 bytees of document are " << docSizeLeast4 << "\n";
-	docSize = (((unsigned long)(docSizeMost4)) << (4 * (int)(sizeof docSizePtr))) | ((unsigned long)0);
+	docSize = (((unsigned long)(docSizeMost4)) << (8 * (int)(sizeof(int))));
 	docSize = docSize | ((unsigned long)docSizeLeast4);
 	std::cout << "Doc size is  " << docSize << "\n";
 	return docSize;
@@ -110,12 +110,12 @@ char* readRequest(int connfd) {
 	return NULL;
 }
 
-void writeBadRequest(int connfd) {
-	if (write(connfd, BAD_RESPONSE, BAD_RESPONSE_LEN) < BAD_RESPONSE_LEN) {
-		std::cout << "Did not finish writing error response\n";
+void respond(int connfd, const char* responseStr, int responseStrLen) {
+	if (write(connfd, responseStr, responseStrLen) < responseStrLen) {
+		std::cout << "Did not finish writing response\n";
 	}
 	else {
-		std::cout << "Successfully returned error response\n";
+		std::cout << "Successfully returned response\n";
 	}
 }
 
@@ -138,7 +138,10 @@ int main() {
         exit(1);
         //return 1;
     }
-    bankBackend* backend = new bankBackend(); 
+    bankRequestParser* parser = new bankRequestParser();
+    bankBackend* backend = new bankBackend();
+    bankResponseWriter* writer = new bankResponseWriter(); 
+    std::string errorResponse = writer->getParseErrorResponse();
 	while(1) {
 		if ((connfd = accept(listenFd, (struct sockaddr *)&cliaddr, &len)) == -1) {
 			perror("Unable to accept connection");
@@ -148,60 +151,37 @@ int main() {
 			char * reqBuffer;
 			if ((reqBuffer = readRequest(connfd))) {
 				// hand over to parser -> eventually either a separate thread, or a threadpool, etc
-				/* TEMP
-				int written;
-				if((written = write(connfd, response, strlen(response))) < 0) {
-					perror("Unable to write to client");
-				}
-				else {
-					std::cout << "Succesfully written to client\n";
-				}
-				*/
-				bankRequestParser* test = new bankRequestParser(reqBuffer, (unsigned long)strlen(reqBuffer)); // can put on stack instead of heap?   
-			    if (test->parseRequest()) {
+				parser->initialize(reqBuffer, (unsigned long)strlen(reqBuffer));
+			    if (parser->parseRequest()) { // parser returned error while reading document
 			    	std::cout << "Unable to parse request, must be badly formed.\n";
 			    	// should return error xml
-			    	writeBadRequest(connfd);// TEMP
+					respond(connfd, errorResponse.c_str(), (int)errorResponse.size());			    	
 			    }
 			    else { // creates, balances, transfers and queries for this request are all available now
-			    	/*
-				    std::vector<std::tuple<unsigned long, float, bool, std::string>*>* testCreates = test->getCreateReqs();
-				    for (std::vector<std::tuple<unsigned long, float, bool, std::string>*>::iterator it = testCreates->begin(); it < testCreates->end(); it ++ ) {
-				      std::tuple<unsigned long, float, bool, std::string> testCreate = **it;
-				      std::cout << "Account: " << std::get<0>(testCreate) << "; " << std::get<1>(testCreate) << "; " << std::get<2>(testCreate) << ";" << std::get<3>(testCreate) << "\n";
-				    }
-				    */
-				    std::vector<std::tuple<bool, std::string>> createResults = backend->createAccounts(test->getCreateReqs());
-				    std::vector<std::tuple<float, std::string>> balanceResults = backend->getBalances(test->getBalanceReqs());
-				    std::vector<std::tuple<bool, std::string>> transferResults = backend->doTransfers(test->getTransferReqs());
-				    for (std::vector<std::tuple<bool, std::string>>::iterator it = createResults.begin(); it < createResults.end(); it ++) {
-				    	std::tuple<bool, std::string> createResult = *it;
-				    	std::cout << "Create Result: " << std::get<0>(createResult) << "; Ref: " << std::get<1>(createResult) << "\n";
-				    }
-
-				    for (std::vector<std::tuple<float, std::string>>::iterator it = balanceResults.begin(); it < balanceResults.end(); it ++) {
-				    	std::tuple<float, std::string> balanceResult = *it;
-				    	std::cout << "Balance Result: " << std::get<0>(balanceResult) << " Ref: " << std::get<1>(balanceResult) << "\n";
-				    }
-
-				    for (std::vector<std::tuple<bool, std::string>>::iterator it = transferResults.begin(); it < transferResults.end(); it ++) {
-				    	std::tuple<bool, std::string> transferResult = *it;
-				    	std::cout << "Transfer Result: " << std::get<0>(transferResult) << "; Ref: " << std::get<1>(transferResult) << "\n";
-				    }
-
-				    test->cleanUp(); // done with request, clean up all XMLParsing resources
+				    std::vector<std::tuple<bool, std::string>> createResults = backend->createAccounts(parser->getCreateReqs());
+				    std::vector<std::tuple<float, std::string>> balanceResults = backend->getBalances(parser->getBalanceReqs());
+				    std::vector<std::tuple<int, std::string>> transferResults = backend->doTransfers(parser->getTransferReqs());
+				    // TO-DO : QUERIES
+				    std::string successResponse = writer->constructResponse(&createResults, &balanceResults, &transferResults, NULL);
+				    respond(connfd, successResponse.c_str(), (int)successResponse.size());
 				}
-			    delete test;
+			    //delete test;
+			    parser->cleanUp(); // done with request, clean up all XMLParsing resources
 			}
 			else { // bad request
-				writeBadRequest(connfd);
+				//respondToMissingHeader(connfd);
+				respond(connfd, errorResponse.c_str(), (int)errorResponse.size());
 			}
 			close(connfd);
+			free(reqBuffer);
 		}
 	}
+	backend->cleanUp();
+	delete parser;
+	delete backend;
+	delete writer;
 	close(listenFd);
 	XMLPlatformUtils::Terminate();
 	return 0;
-
 }
 

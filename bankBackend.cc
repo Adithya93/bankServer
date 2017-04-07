@@ -1,10 +1,4 @@
-#include <iostream>
-#include <map>
-#include <unordered_set>
-#include <vector>
-#include <queue>
 #include "./bankBackend.h"
-//#include "./bankDBHandler.h"
 
 //using namespace std;
 /*
@@ -17,6 +11,10 @@ bankBackend::bankBackend() {
     dbHandler = new bankDBHandler();
 }
 
+void bankBackend::cleanUp() {
+    delete cache;
+    delete dbHandler;
+}
 
 std::map<unsigned long, float>::iterator bankBackend::findAccount(unsigned long account) {
     return cache->find(account);
@@ -76,53 +74,25 @@ bool bankBackend::setBalance(unsigned long account, float balance, bool reset) {
 
 // for transfers
 //void bankBackend::saveTransfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string>* tags) {
-bool bankBackend::saveTransfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags) {
-    //std::tuple<unsigned long, unsigned long, float, std::vector<std::string>*>* transTup = new std::tuple<unsigned long, unsigned long, float, std::vector<std::string>*>(fromAccount, toAccount, amount, tags);
-    //std::tuple<unsigned long, unsigned long, float, std::vector<std::string>> transTup(fromAccount, toAccount, amount, tags); 
+//bool bankBackend::saveTransfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags) {
+int bankBackend::saveTransfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags) {
     int transferSuccess = 0;
     std::tuple<unsigned long, float, unsigned long, float> newBalances = dbHandler->transfer(fromAccount, toAccount, amount, tags, &transferSuccess);
-    if (transferSuccess) { // update cache
+    if (transferSuccess == 1) { // update cache
         cache->insert(std::pair<unsigned long, float>(std::get<0>(newBalances), std::get<1>(newBalances)));
         cache->insert(std::pair<unsigned long, float>(std::get<2>(newBalances), std::get<3>(newBalances)));
     }
     // transfer failed, so cache is still valid
-    return transferSuccess == 1;
+    return transferSuccess;
 }
 
 // for transfers
 //bool bankBackend::transfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string>* tags) {
-bool bankBackend::transfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags) {
+//bool bankBackend::transfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags) {
+int bankBackend::transfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags) {
     /* NO POINT CHECKING IN CACHE FOR THIS
-    unsigned long from;
-    unsigned long to;
-    if (amount > 0) {
-        from = fromAccount;
-        to = toAccount;
-    }
-    else if (amount < 0) {
-        from = toAccount;
-        to = fromAccount;
-        amount *= -1;
-    }
-    else {
-        printf("Ignoring 0 transfer from %lu to %lu\n", fromAccount, toAccount);
-        return false;
-    }
-    std::map<unsigned long, float>::iterator fromIt = findAccount(from);
-    std::map<unsigned long, float>::iterator toIt = findAccount(to);
-    if (fromIt == cache->end() || toIt == cache->end()) {
-        printf("Non-existent account in transfer from %lu to %lu, ignoring\n", fromAccount, toAccount);
-        return false;
-    }
-    if (fromIt->second < amount) {
-        printf("Insufficient funds in account %lu, unable to transfer %f\n", from, amount);
-        return false;
-    }
-    setBalance(from, fromIt->second - amount, true);
-    setBalance(to, toIt->second + amount, true);
     */
     return saveTransfer(fromAccount, toAccount, amount, tags); // write to DB
-    //return true;
 }
 
 // Since this is per-request state, it does not need persistence, hence object returned instead of allocated pointer, to facilitate exception safety
@@ -148,26 +118,17 @@ std::vector<std::tuple<float, std::string>> bankBackend::getBalances(std::vector
 }
 
 // Same as above, for all transfers in a request
-std::vector<std::tuple<bool, std::string>> bankBackend::doTransfers(std::vector<std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>> transferReqs) {
-    std::vector<std::tuple<bool, std::string>> resultVec;
+//std::vector<std::tuple<bool, std::string>> bankBackend::doTransfers(std::vector<std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>> transferReqs) {
+std::vector<std::tuple<int, std::string>> bankBackend::doTransfers(std::vector<std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>> transferReqs) {
+    //std::vector<std::tuple<bool, std::string>> resultVec;
+    std::vector<std::tuple<int, std::string>> resultVec;
     for (std::vector<std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>>::iterator it = transferReqs.begin(); it < transferReqs.end(); it ++ ) {
         std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>> reqTuple = *it;
-        bool transferResult = transfer(std::get<0>(reqTuple), std::get<1>(reqTuple), std::get<2>(reqTuple), std::get<4>(reqTuple));
-        resultVec.push_back(std::tuple<bool, std::string>(transferResult, std::get<3>(reqTuple)));
+        //bool transferResult = transfer(std::get<0>(reqTuple), std::get<1>(reqTuple), std::get<2>(reqTuple), std::get<4>(reqTuple));
+        int transferResult = transfer(std::get<0>(reqTuple), std::get<1>(reqTuple), std::get<2>(reqTuple), std::get<4>(reqTuple));
+        //resultVec.push_back(std::tuple<bool, std::string>(transferResult, std::get<3>(reqTuple)));
+        resultVec.push_back(std::tuple<int, std::string>(transferResult, std::get<3>(reqTuple)));
     }
     return resultVec;
 }
 
-/*
-// for queries
-unordered_set<tuple<unsigned long, unsigned long, float, vector<string>*>*> processORQuery(unordered_set<tuple<unsigned long, unsigned long, float, vector<string>*>*> querySet, vector<>) {
-
-    return NULL;
-}
-
-
-unordered_set<tuple<unsigned long, unsigned long, float, vector<string>*>*> processQueryAmountConds() {
-
-    return NULL;
-}
-*/

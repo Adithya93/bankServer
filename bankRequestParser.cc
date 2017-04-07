@@ -1,25 +1,35 @@
-#include <xercesc/util/PlatformUtils.hpp>
-#include <xercesc/parsers/XercesDOMParser.hpp>
-#include <xercesc/dom/DOM.hpp>
-#include <xercesc/sax/HandlerBase.hpp>
-#include <xercesc/util/XMLString.hpp>
-#include <xercesc/framework/MemBufInputSource.hpp>
-#include <iostream>
-#include <map>
-#include <unordered_set>
-#include <vector>
-#include <queue>
 #include "./bankRequestParser.h"
 
 using namespace xercesc;
-  bankRequestParser::bankRequestParser(const char* requestBuffer, size_t requestSize) { // TO-DO : Refactor for better exception safety?
-      parser = (XercesDOMParser*) new XercesDOMParser();
-      parser->setValidationScheme(XercesDOMParser::Val_Always);
-      parser->setDoNamespaces(true);    // optional
-      errHandler = (ErrorHandler*) new HandlerBase();
-      parser->setErrorHandler(errHandler);
-      source = (MemBufInputSource*) new MemBufInputSource((const XMLByte*)requestBuffer, (const XMLSize_t) requestSize, "test"); // TO-DO: Use threadId or some identifier as last arg
+
+  bankRequestParser::bankRequestParser() { // TO-DO : Refactor for better exception safety?
+    //initialize();      
   }
+
+
+  void bankRequestParser::initialize(const char* requestBuffer, size_t requestSize) {
+    parser = (XercesDOMParser*) new XercesDOMParser();
+    parser->setValidationScheme(XercesDOMParser::Val_Always);
+    parser->setDoNamespaces(true);    // optional
+    errHandler = (ErrorHandler*) new HandlerBase();
+    parser->setErrorHandler(errHandler);
+    source = (MemBufInputSource*) new MemBufInputSource((const XMLByte*)requestBuffer, (const XMLSize_t) requestSize, "test"); // TO-DO: Use threadId or some identifier as last arg  
+  }
+
+  void bankRequestParser::cleanUp() {
+      delete parser;
+      delete errHandler;
+      delete source;
+  }
+
+
+  /*
+  // Called after servicing every request
+  void bankRequestParser::clearRequest() {
+    cleanUp();
+    //initialize();
+  }
+  */
 
   int bankRequestParser::parseRequest() { 
       try {
@@ -243,6 +253,8 @@ using namespace xercesc;
     return 0;
   }
 
+  // How to store query reqs?
+
   std::vector<std::tuple<unsigned long, float, bool, std::string>> bankRequestParser::getCreateReqs() {
     return createReqs;
   }
@@ -260,8 +272,4 @@ using namespace xercesc;
     return reset;
   }
 
-  void bankRequestParser::cleanUp() {
-      delete parser;
-      delete errHandler;
-      delete source;
-  }
+  

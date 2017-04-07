@@ -27,5 +27,10 @@ class bankDBHandler {
     //pqxx::result saveTags(unsigned long transferID, std::vector<std::string> tags, pqxx::work* txnRef, int* success); 
 
     pqxx::result saveTxn(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags, int* success);
+
+    float MIN_BALANCE = 0;
+    int INSUFFICIENT_FUNDS = -1;
+    int INVALID_ACCOUNT = -2;
+
   
 };

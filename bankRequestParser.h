@@ -15,7 +15,9 @@ class bankRequestParser {
         MemBufInputSource* source;
         ErrorHandler* errHandler;
 
-        bankRequestParser(const char* requestBuffer, size_t requestSize);
+        bankRequestParser();
+
+        void initialize(const char* requestBuffer, size_t requestSize);
 
         int parseRequest();
 
@@ -36,6 +38,8 @@ class bankRequestParser {
 
         bool hasReset();
 
+        //void clearRequest();
+
         void cleanUp();
 
 
@@ -43,6 +47,7 @@ class bankRequestParser {
       std::vector<std::tuple<unsigned long, float, bool, std::string>> createReqs;
       std::vector<std::tuple<unsigned long, std::string>>  balanceReqs;
       std::vector<std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>> transferReqs;
+      //std::vector<>
       bool reset;
       DOMElement* root;
 
