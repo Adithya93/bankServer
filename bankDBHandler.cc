@@ -75,9 +75,10 @@ pqxx::result bankDBHandler::saveAccount(unsigned long account, float balance, bo
     queryString = "UPDATE accounts SET balance = " + std::to_string(balance) + " WHERE id = " + std::to_string(account);
     std::cout << "Updating balance of account no. " << account;
     */
-    int updateSuccess = 0;
-    pqxx::result updateResult = updateBalance(account, balance, &updateSuccess);
-    *result = updateSuccess; // if updateBalance succeeded, so did this method, and vice-versa
+    //int updateSuccess = 0;
+    //pqxx::result updateResult = updateBalance(account, balance, &updateSuccess);
+    pqxx::result updateResult = updateBalance(account, balance, result);
+    //*result = updateSuccess; // if updateBalance succeeded, so did this method, and vice-versa
     return updateResult;
   }
 
@@ -108,13 +109,18 @@ pqxx::result bankDBHandler::updateBalances(unsigned long fromAccount, float from
 /* NEED TO MAKE SAVING OX TXN AND SAVING OF TAG ATOMIC!
 // INSERTING MULTIPLE VALUES IN 1 INSERT QUERY IS FASTER THAN RUNNING MULTIPLE SINGLE-VALUE INSERT QUERIES
 // NOTE : LIMIT OF 1000 VALUES IN A SINGLE INSERT
-pqxx::result bankDBHandler::saveTags(unsigned long transferID, std::vector<std::string> tags, int* success) {
+*/
+
+/*
+pqxx::result bankDBHandler::saveTags(unsigned long transferID, std::vector<std::string> tags, pqxx::work * txnRef, int* success) {
+  
   pqxx::connection c{"dbname=bankServer user=radithya"};
   pqxx::work txn{c};
-
+  
+  pqxx::work txn = *txnRef;
   std::string queryString("INSERT INTO tags (tag, txnID) VALUES\n");
   std::string transferIDStr = std::to_string(transferID);
-  for (std::vector<string>::iterator it = tags.begin(); it < tags.end() - 1; it ++) {
+  for (std::vector<std::string>::iterator it = tags.begin(); it < tags.end() - 1; it ++) {
     std::string tag = *it;
     queryString.append("(" + tag + ", " + transferIDStr + "), ");
   }
@@ -125,33 +131,53 @@ pqxx::result bankDBHandler::saveTags(unsigned long transferID, std::vector<std::
   txn.commit();
   *success = 1; // Set success flag for caller
   std::cout << "Txn committed!\n";
-
   return r;
 }
-
+*/
 
 pqxx::result bankDBHandler::saveTxn(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags, int* success) {
   pqxx::connection c{"dbname=bankServer user=radithya"};
   pqxx::work txn{c};
 
-  std::string queryString("INSERT INTO txns (f, t, a) VALUES\n(" + std::to_string(fromAccount) + ", " + std::to_string(toAccount) + ", " + std::to_string(amount) + ")");
+  std::string queryString("INSERT INTO txns (f, t, a)\nVALUES\n(" + std::to_string(fromAccount) + ", " + std::to_string(toAccount) + ", " + std::to_string(amount) + ")\nRETURNING txns.id;");
   std::cout << "Query string:\n" << queryString << "\n";
   pqxx::result r = txn.exec(queryString);
   std::cout << "About to commit txn!\n";
-  
+
+  unsigned long txnID;
+  if (r.size() == 0 || r[0]["ID"].is_null() || !r[0]["ID"].to(txnID)) {
+    // Can't save tags, don't commit
+    *success = 0; // fail
+    return r;
+  }
   // Save Tags, if any
   if (tags.size() > 0) {
-    return saveTags();
+
+    std::string queryString("INSERT INTO tags (tag, txnID) VALUES\n");
+    std::string transferIDStr = std::to_string(txnID);
+    for (std::vector<std::string>::iterator it = tags.begin(); it < tags.end() - 1; it ++) {
+      std::string tag = *it;
+      queryString.append("('" + tag + "', " + transferIDStr + "), ");
+    }
+    queryString.append("('" + *(tags.end() - 1) + "', " + transferIDStr + ")");
+    std::cout << "Query string:\n" << queryString << "\n";
+    pqxx::result r = txn.exec(queryString);
+    // TO-DO : Check result r of execution?
+    std::cout << "About to commit txn!\n";
+    //txn.commit();
+    //*success = 1; // Set success flag for caller
+    //std::cout << "Txn committed!\n";
+    //return saveTags(txnID, tags, &txn, success);
   }
   else {
     std::cout << "No tags to save for this transfer\n";
   }
-
   txn.commit();
   *success = 1; // Set success flag for caller
   std::cout << "Txn committed!\n";
   return r;
 }
+/*
 */
 
 // Validation done beforehand
@@ -207,26 +233,12 @@ std::tuple<unsigned long, float, unsigned long, float> bankDBHandler::transfer(u
     //return updateResult;
   }
 
-  /*
-  // updateAccount of toAccount with toBalance + amount ; if failure return failure
-  updateSuccess = 0;
-  updateResult = updateBalance(toAccount, toBalance + amount, &updateSuccess);
-  if (!updateSuccess) {
-    std::cout << "Unable to add amount to recipient of transfer, aborting\n";
-    *success = 0; // fail
-    return std::tuple<unsigned long, float, unsigned long, float>(0, 0, 0, 0); // value will be ignored
-    //return updateResult;
-  }
-  */
-
   // NOTE : THIS TAKES THE RISK OF ACCOUNTS BEING SAVED WITHOUT TAGS.... IS THIS ALRIGHT? MAYBE CHANGE TO INCLUDE THIS IN ABOVE TXN TOO?
-  // Save to txn table
-  
+  // Save to txn table  
   // UNCOMMENT WHEN ATOMICITY RESTORED
-  //pqxx::result txnSaveResult = saveTxn(fromAccount, toAccount, amount, tags, success);
-  
+  pqxx::result txnSaveResult = saveTxn(fromAccount, toAccount, amount, tags, success);
   // return success
-  *success = 1;
+  //*success = 1;
   return std::tuple<unsigned long, float, unsigned long, float>(fromAccount, fromBalance - amount, toAccount, toBalance + amount); // value will be written into cache
   //return updateResult;
 }

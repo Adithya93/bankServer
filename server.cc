@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include "./bankRequestParser.h"
 #include "./bankBackend.h"
+#include "./bankResponseWriter.h"
 
 
 //using namespace std;

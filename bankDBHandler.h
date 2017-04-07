@@ -24,7 +24,7 @@ class bankDBHandler {
 
     pqxx::result updateBalances(unsigned long fromAccount, float fromBalanceNew, unsigned long toAccount, float toBalanceNew, int* success); 
 
-    pqxx::result saveTags(unsigned long transferID, std::vector<std::string> tags, int* success);
+    //pqxx::result saveTags(unsigned long transferID, std::vector<std::string> tags, pqxx::work* txnRef, int* success); 
 
     pqxx::result saveTxn(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags, int* success);
   
