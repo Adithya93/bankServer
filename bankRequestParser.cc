@@ -253,7 +253,156 @@ using namespace xercesc;
     return 0;
   }
 
-  // How to store query reqs?
+
+  int bankRequestParser::parseQueryReqs() {
+    DOMNodeList* queries = root->getElementsByTagName(XMLString::transcode("query"));
+    printf("No. of queries: %lu\n", queries->getLength());
+    //iterate through DOMNodes
+    std::vector<std::tuple<std::string, std::string>> queryReqsVec;
+    int hasError = 0;
+    for (int i = 0; i < queries->getLength(); i ++) {
+      std::string ref;
+      DOMNode* child = queries->item(i);
+      const XMLCh* nodeText = child->getTextContent();
+      wprintf(L"Node value: %s\n", nodeText);
+      const XMLCh* refXML = child->getAttributes()->getNamedItem(XMLString::transcode("ref"))->getTextContent();
+      ref = XMLString::transcode(refXML);
+      std::cout << "Ref: " << ref << "\n";
+      DOMNodeList* grandchildren = child->getChildNodes();
+
+      //bool implictAnd = grandchildren->getLength() > 1; // if more than 1 tag directly under <query>, they are implicitly ANDed together
+      queryNode* root;
+      if (grandchildren->getLength() > 1) { // implicit AND
+        root = new queryNode('a');
+        for (int childNodeNum = 0; childNodeNum < grandchildren->getLength(); childNodeNum ++) {
+          queryNode* rootChild = parseQueryNode(grandchildren->item(childNodeNum));
+          if (!rootChild) {
+            deleteQueryNodes(root);
+            root = NULL;
+            hasError = 1;
+            break;
+          }
+          root->addChild(rootChild);
+        }
+      }
+
+      else if (grandchildren->getLength() == 0) { // empty query
+        std::cout << "Empty query tag, treating as TRUE\n";
+        queryReqsVec.push_back(std::tuple<std::string, std::string>("TRUE", ref));
+        printf("Done with query %d\n", i);
+        continue;
+      }
+      
+      else { // get tag name of top-level tag within query
+        root = parseQueryNode(grandchildren->item(0));
+      }
+      std::string queryString;
+      if (!root) {
+        std::cout << "Query " << i << " of ref " << ref << " is invalid\n";
+        queryString = "";
+        hasError = 1;
+      }
+      else {
+        queryString = root->getQueryString();
+        std::cout << "Query String for query number " << i << " of ref " << ref << " is " << queryString << "\n";
+        deleteQueryNodes(root);
+      }
+      queryReqsVec.push_back(std::tuple<std::string, std::string>(queryString, ref));      
+      printf("Done with query %d\n", i);
+    }
+    queryReqs = queryReqsVec;
+    return hasError;
+  }
+
+
+  queryNode* bankRequestParser::parseQueryNode(DOMNode* domNode) {
+      queryNode* q;
+      const char * nodeName = XMLString::transcode(domNode->getNodeName());
+      char rel;
+      char attr;
+      if (strcmp(nodeName, "and") == 0) {
+        rel = 'a';
+      }
+      else if (strcmp(nodeName, "or") == 0) {
+        rel = 'o';
+      }
+      else if (strcmp(nodeName, "not") == 0) {
+        rel = 'n';
+      }
+      else { // relational operator - Base-Case : No child nodes
+        
+        DOMNamedNodeMap * attrs = domNode->getAttributes();
+        if (attrs->getLength() != 1) {
+          std::cout << "Wrong number of attributes in query relational operator: " << attrs->getLength() << "\n";
+          // can flag this query as invalid and move on to next query
+          return NULL;
+        }
+        DOMNode* attrNode = attrs->item(0);
+        const char * attrNodeName = XMLString::transcode(attrNode->getNodeName());
+        const char * attrNodeValue = XMLString::transcode(attrNode->getNodeValue());
+        std::string val(attrNodeValue);
+        if (strcmp(attrNodeName, "from") == 0) {
+          attr = 'f';
+        }
+        else if (strcmp(attrNodeName, "to") == 0) {
+          attr = 't';
+        }
+        else if (strcmp(attrNodeName, "amount") == 0) {
+          attr = 'a';
+        }
+        else { // invalid attribute
+          std::cout << "Unknown transaction attribute specified in query relational operator: " << attrNodeName << "\n";
+          // can flag this query as invalid and move on to next query
+          return NULL;
+        }
+        if (strcmp(nodeName, "greater") == 0) {
+          rel = '>';
+        }
+        else if (strcmp(nodeName, "less") == 0) {
+          rel = '<';
+        }
+        else if (strcmp(nodeName, "equals") == 0) {
+          rel = '=';
+        }
+        else { // invalid operator
+          std::cout << "Invalid relational operator\n";
+          return NULL;
+        }
+        std::cout << "Adding simple node with query " << q->getQueryString() << "\n";
+        return q;
+      }
+      // logical operator: add children, and if any child invalid, invalidate entire query tree
+      q = new queryNode(rel);
+      DOMNodeList* nodeChildren = domNode->getChildNodes();
+      for (int childNum = 0; childNum < nodeChildren->getLength(); childNum ++) {
+        queryNode * childQueryNode = parseQueryNode(nodeChildren->item(childNum));
+        if (!childQueryNode) {
+          // free all resources and return NULL
+          deleteQueryNodes(q); // q freed
+          return NULL;
+        }
+        q->addChild(childQueryNode);
+      }
+      return q;
+  }
+
+  void bankRequestParser::deleteQueryNodes(queryNode * q) {
+    std::vector<queryNode*>* qChildren = q->getChildren();
+    for (std::vector<queryNode*>::iterator it = qChildren->begin(); it < qChildren->end(); it ++) {
+      deleteQueryNodes(*it);
+    }
+    q->deleteNode(); // Free memory allocated by q
+    delete q;
+  }
+
+  /*
+  void deleteRootNodeChildren(queryNode * root) {
+    std::vector<queryNode*>* rootChildren = root->getChildren();
+    for (std::vector<queryNode*>::iterator it = rootChildren->begin(); it < rootChildren->end(); it ++) {
+      deleteQueryNodes(*it);
+    }
+  }
+  */
 
   std::vector<std::tuple<unsigned long, float, bool, std::string>> bankRequestParser::getCreateReqs() {
     return createReqs;

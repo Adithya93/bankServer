@@ -6,6 +6,8 @@
 #include <xercesc/framework/MemBufInputSource.hpp>
 #include <iostream>
 #include <vector>
+#include "./queryNode.h"
+
 
 using namespace xercesc;
 
@@ -29,6 +31,8 @@ class bankRequestParser {
 
         int parseTransferReqs();
 
+        int parseQueryReqs();
+
         std::vector<std::tuple<unsigned long, float, bool, std::string>> getCreateReqs();
 
         std::vector<std::tuple<unsigned long, std::string>> getBalanceReqs();
@@ -47,8 +51,14 @@ class bankRequestParser {
       std::vector<std::tuple<unsigned long, float, bool, std::string>> createReqs;
       std::vector<std::tuple<unsigned long, std::string>>  balanceReqs;
       std::vector<std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>> transferReqs;
+      std::vector<std::tuple<std::string, std::string>> queryReqs;
       //std::vector<>
       bool reset;
       DOMElement* root;
+
+      queryNode* parseQueryNode(DOMNode * domNode); 
+
+      void deleteQueryNodes(queryNode * q);
+
 
 };
