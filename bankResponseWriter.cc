@@ -2,7 +2,7 @@
 
 
 	bankResponseWriter::bankResponseWriter() {
-		unparseableError = std::string("<?xml version=\"1.0\" encoding=\"UTF-8\" ?><error>Unparseable document. Please ensure proper formatting and correct length specification in header.</error>");
+		unparseableError = std::string("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<error>Unparseable document. Please ensure proper formatting and correct length specification in header.</error>\n");
 	}
 
 	std::string bankResponseWriter::getParseErrorResponse() {
@@ -10,7 +10,7 @@
 	}
 
 	std::string bankResponseWriter::createSuccessResponse(std::string ref) {
-		return "<success ref=\"" + ref + "\">created</success>";
+		return "<success ref=\"" + ref + "\">created</success>\n";
 	}
 
 	std::string bankResponseWriter::createErrorResponse(std::string ref) {
@@ -18,33 +18,57 @@
 	}
 
 	std::string bankResponseWriter::balanceSuccessResponse(std::string ref, float balance) {
-		return "<success ref=\"" + ref + "\">" + std::to_string(balance) + "</success>";
+		return "<success ref=\"" + ref + "\">" + std::to_string(balance) + "</success>\n";
 	}
 
 	std::string bankResponseWriter::balanceErrorResponse(std::string ref) {
-		return "<error ref=\"" + ref + "\"> Balance does not exist </error>";
+		return "<error ref=\"" + ref + "\"> Balance does not exist </error>\n";
 	}
 
 	std::string bankResponseWriter::transferSuccessResponse(std::string ref) {
-		return "<success ref=\"" + ref + "\">transferred</success>";
+		return "<success ref=\"" + ref + "\">transferred</success>\n";
 	}
 
 	std::string bankResponseWriter::transferErrorResponseInsufficientFunds(std::string ref) {
-		return "<error ref=\"" + ref + "\"> Insufficient Funds </error>";
+		return "<error ref=\"" + ref + "\"> Insufficient Funds </error>\n";
 	}
 
 	std::string bankResponseWriter::transferErrorResponseInvalidAccount(std::string ref) {
-		return "<error ref=\"" + ref + "\"> Invalid Account </error>";
+		return "<error ref=\"" + ref + "\"> Invalid Account </error>\n";
 	}
 
-	std::string bankResponseWriter::queryResponse(std::string ref, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>* queryResults) {
+	std::string bankResponseWriter::querySuccessResponse(std::string ref, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>* queryResults) {
+		//std::cout << "Appending successful query result\n";
+		std::string header("<results ref=" + ref + "\">\n");
+		std::string footer("</results>\n");
+		std::string body;
+		for (std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>::iterator it = queryResults->begin(); it < queryResults->end(); it ++) {
+			std::tuple<unsigned long, unsigned long, float, std::vector<std::string>> transferTup = *it;
+			body += "<transfer>\n";
+			body += "<from>" + std::to_string(std::get<0>(transferTup)) + "</from>\n";
+			body += "<to>" + std::to_string(std::get<1>(transferTup)) + "</to>\n";
+			body += "<amount>" + std::to_string(std::get<2>(transferTup)) + "</amount>\n";
+			body += "<tags>\n"; // include <tags></tags> even when no tags?
+			std::vector<std::string> tags = std::get<3>(transferTup);
+			for (std::vector<std::string>::iterator it2 = tags.begin(); it2 < tags.end(); it2 ++) {
+				body += "<tag>" + *it2 + "</tag>\n";
+			}
+			body += "</tags>\n";
+			body += "</transfer>\n";
+		}
+		//std::string result(header + body + footer);
+		//std::cout << "querySuccessResponse string: " << result << "\n";
+		//return result;
+		return header + body + footer;
+	}
 
-		return std::string(); // TEMP
+	std::string bankResponseWriter::queryErrorResponse(std::string ref) {
+		return "<error ref=\"" + ref + "\"> Invalid Query </error>";
 	}
 
 	// Only for successfully parsed requests
 	//std::string bankResponseWriter::constructResponse(std::vector<std::tuple<bool, std::string>>* createResults, std::vector<std::tuple<float, std::string>>* balanceResults, std::vector<std::tuple<bool, std::string>>* transferResults, std::vector<std::tuple<std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>>* queryResults) {
-	std::string bankResponseWriter::constructResponse(std::vector<std::tuple<bool, std::string>>* createResults, std::vector<std::tuple<float, std::string>>* balanceResults, std::vector<std::tuple<int, std::string>>* transferResults, std::vector<std::tuple<std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>>* queryResults) {
+	std::string bankResponseWriter::constructResponse(std::vector<std::tuple<bool, std::string>>* createResults, std::vector<std::tuple<float, std::string>>* balanceResults, std::vector<std::tuple<int, std::string>>* transferResults, std::vector<std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>>* queryResults) {
 		std::string opening("<?xml version=\"1.0\" encoding=\"UTF-8\" ?><results>");
 		std::string body;
 
@@ -82,10 +106,14 @@
 			}
 		}
 
-		if (queryResults) {
-			for (std::vector<std::tuple<std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>>::iterator it = queryResults->begin(); it < queryResults->end(); it ++) {
-				std::tuple<std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>> queryResult = *it;
-				body.append(queryResponse(std::get<0>(queryResult), &std::get<1>(queryResult)));			
+		for (std::vector<std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>>::iterator it = queryResults->begin(); it < queryResults->end(); it ++) {
+			std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>> queryResult = *it;
+			if (!std::get<0>(queryResult)) { // error
+				body.append(queryErrorResponse(std::get<1>(queryResult)));
+			}
+			else {
+				//std::cout << "Appending query success response\n";
+				body.append(querySuccessResponse(std::get<1>(queryResult), &std::get<2>(queryResult)));
 			}
 		}
 		std::string closing("</results>");

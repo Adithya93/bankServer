@@ -95,6 +95,10 @@ int bankBackend::transfer(unsigned long fromAccount, unsigned long toAccount, fl
     return saveTransfer(fromAccount, toAccount, amount, tags); // write to DB
 }
 
+std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>> bankBackend::query(std::string queryString) {
+    return dbHandler->query(queryString);
+}
+
 // Since this is per-request state, it does not need persistence, hence object returned instead of allocated pointer, to facilitate exception safety
 std::vector<std::tuple<bool, std::string>> bankBackend::createAccounts(std::vector<std::tuple<unsigned long, float, bool, std::string>> createReqs) {
     std::vector<std::tuple<bool, std::string>> resultVec;
@@ -128,6 +132,22 @@ std::vector<std::tuple<int, std::string>> bankBackend::doTransfers(std::vector<s
         int transferResult = transfer(std::get<0>(reqTuple), std::get<1>(reqTuple), std::get<2>(reqTuple), std::get<4>(reqTuple));
         //resultVec.push_back(std::tuple<bool, std::string>(transferResult, std::get<3>(reqTuple)));
         resultVec.push_back(std::tuple<int, std::string>(transferResult, std::get<3>(reqTuple)));
+    }
+    return resultVec;
+}
+
+std::vector<std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>> bankBackend::doQueries(std::vector<std::tuple<std::string, std::string>> queryReqs) {
+    std::vector<std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>> resultVec;
+    for (std::vector<std::tuple<std::string, std::string>>::iterator it = queryReqs.begin(); it < queryReqs.end(); it ++) {
+        std::tuple<std::string, std::string> reqTuple = *it;
+        if (std::get<0>(reqTuple).size() == 0) { // invalid query
+            std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>> emptyResult;
+            resultVec.push_back(std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>(false, std::get<1>(reqTuple), emptyResult));
+        }
+        else {
+            std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>> queryResult = query(std::get<0>(reqTuple));
+            resultVec.push_back(std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>(true, std::get<1>(reqTuple), queryResult));
+        }
     }
     return resultVec;
 }

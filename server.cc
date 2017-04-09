@@ -161,8 +161,10 @@ int main() {
 				    std::vector<std::tuple<bool, std::string>> createResults = backend->createAccounts(parser->getCreateReqs());
 				    std::vector<std::tuple<float, std::string>> balanceResults = backend->getBalances(parser->getBalanceReqs());
 				    std::vector<std::tuple<int, std::string>> transferResults = backend->doTransfers(parser->getTransferReqs());
+				    std::vector<std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>> queryResults = backend->doQueries(parser->getQueryReqs());
+
 				    // TO-DO : QUERIES
-				    std::string successResponse = writer->constructResponse(&createResults, &balanceResults, &transferResults, NULL);
+				    std::string successResponse = writer->constructResponse(&createResults, &balanceResults, &transferResults, &queryResults);
 				    respond(connfd, successResponse.c_str(), (int)successResponse.size());
 				}
 			    //delete test;

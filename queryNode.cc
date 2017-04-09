@@ -3,7 +3,7 @@
 queryNode::queryNode(char rel, std::string val, char attr) {
 	this->rel = rel;
 	this->attr = attr;
-	//this->val = !isLogical() ? val : rel == 'a' ? " AND " : rel == 'o' ? " OR " : " NOT "; 
+	this->val = !isLogical() ? val : rel == 'a' ? " AND " : rel == 'o' ? " OR " : " NOT "; 
 	children = new std::vector<queryNode*>();
 	subTreeValid = true;
 }
@@ -11,14 +11,17 @@ queryNode::queryNode(char rel, std::string val, char attr) {
 void queryNode::deleteNode() {
 	for (std::vector<queryNode*>::iterator it = children->begin(); it < children->end(); it ++) {
 		(*it)->deleteNode();
+		delete *it;
 	}
 	delete children;
 	//delete this; // apparently considered bad practice, so call delete queryRequest from requestParser instead
 }
 
 bool queryNode::addChild(queryNode* child) { // only add if valid, else delete
-	if (isValid() && child->isValid()) {
+	//if (isValid() && child->isValid()) {
+	if (child->isValid()) {
 		this->children->push_back(child);
+		std::cout << "Added child " << child->getString() << " to parent " << getString() << "\n";
 		return true;
 	}
 	else {
@@ -55,11 +58,47 @@ bool queryNode::isLogical() {
 
 bool queryNode::isValid() {
 	bool logical = isLogical();
-	return subTreeValid && ((logical && ((rel == 'n' && children->size() == 1) ||  ((rel == 'a' || rel == 'o') && children->size() != 1))) || (!logical && (rel == '>' || rel == '<' || rel == '=') && (attr == 'f' || attr == 't' || attr == 'a')));
+	/*
+	if (!subTreeValid) {
+		std::cout << "Subtree of " << getString() << " already invalid\n";
+		return false;
+	}
+	if (logical) {
+		//std::cout << "Verifying validity of logical query node " << rel << "\n";
+		if (rel == 'n') {
+			//std::cout << "Verifying that NOT operator only has 1 child\n";
+			if (children->size() != 1) {
+				std::cout << "NOT operator has " << children->size() << " children; invalid!\n";
+				return false;
+			}
+			//std::cout << "Valid NOT operator\n";
+			return true;
+		}
+		if (rel == 'a' || rel == 'o') {
+			//std::cout << "Verifying that AND/OR operator does not have exactly 1 child\n";
+			if (children->size() == 1) {
+				std::cout << "AND/OR operator has 1 child, invalid!\n";
+				return false;
+			}
+			return true;
+		}
+		std::cout << "Invalid logical operator " << rel << "; Invalid!\n";
+		return false;
+	}
+	if (rel == '>' || rel == '<' || rel == '=') {
+		//std::cout << "Valid relational operator " << rel << "\n";
+		return true;
+	}
+	std::cout << "Unknown relational operator " << rel << "\n";
+	return false;
+	*/
+	// Below One-Liner is equivalent to commented-out code above
+	return subTreeValid && ((logical && (((rel == 'n') && (children->size() == 1)) ||  (((rel == 'a') || (rel == 'o')) && (children->size() != 1)))) || (!logical && ((rel == '>') || (rel == '<') || (rel == '=')) && ((attr == 'f') || (attr == 't') || (attr == 'a'))));
 }
 
 std::string queryNode::getQueryString() { // in-order traversal; should only be called after children have been added
 	if (!isValid()) {
+		//std::cout << "Query string of " << getString() << " is invalid, treating as empty string\n";
 		subTreeValid = false;
 		return "";
 	}

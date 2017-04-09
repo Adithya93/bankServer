@@ -10,13 +10,13 @@ pqxx::result bankDBHandler::updateBalance(unsigned long account, float balance, 
   pqxx::connection c{"dbname=bankServer user=radithya"};
   pqxx::work txn{c};
   std::string queryString("UPDATE accounts SET balance = " + std::to_string(balance) + " WHERE id = " + std::to_string(account));
-  std::cout << "Updating balance of account no. " << account;
-  std::cout << "Query String: " << queryString << "\n";
+  //std::cout << "Updating balance of account no. " << account;
+  //std::cout << "Query String: " << queryString << "\n";
   pqxx::result r = txn.exec(queryString);
-  std::cout << "About to commit txn!\n";
+  //std::cout << "About to commit txn!\n";
   txn.commit();
   *result = 1; // Set success flag for caller
-  std::cout << "Txn committed!\n";
+  //std::cout << "Txn committed!\n";
   return r;
 }
 
@@ -24,20 +24,19 @@ pqxx::result bankDBHandler::getBalance(unsigned long account) {
   pqxx::connection c{"dbname=bankServer user=radithya"};
   pqxx::work txn{c};
   std::string queryString("SELECT * FROM accounts WHERE id = " + std::to_string(account));
-  std::cout << "Query String: " << queryString << "\n";
+  //std::cout << "Query String: " << queryString << "\n";
   pqxx::result r = txn.exec(queryString);
   
-  std::cout << "About to present rows of table\n";
+  //std::cout << "About to present rows of table\n";
   if (r.size() == 0) {
-    std::cout << "Null result\n";
+    std::cout << "Null result for lookup of account for balance\n";
     return r;
   }
-  std::cout << "About to commit txn!\n";
+  //std::cout << "About to commit txn!\n";
   // Not needed for SELECT queries, but just a practice
   txn.commit();
-  std::cout << "Txn committed!\n";
+  //std::cout << "Txn committed!\n";
 
-  // Connection object goes out of scope here.  It closes automatically.
   return r;
 }
 
@@ -46,11 +45,11 @@ pqxx::result bankDBHandler::saveAccount(unsigned long account, float balance, bo
   pqxx::work txn{c};
   bool update = false;
   std::string testQueryString("SELECT * FROM accounts WHERE id = " + std::to_string(account));
-  std::cout << "Test Query String: " << testQueryString << "\n";
+  //std::cout << "Test Query String: " << testQueryString << "\n";
   pqxx::result testResult = txn.exec(testQueryString);    
   if (testResult.size() > 0) { // already exists
     if (!reset) {
-      std::cout << "Account already exists, aborting create request\n";
+      //std::cout << "Account already exists, aborting create request\n";
       return testResult;
     }
     else {
@@ -60,12 +59,12 @@ pqxx::result bankDBHandler::saveAccount(unsigned long account, float balance, bo
   std::string queryString;
   if (!update) {
     queryString = "INSERT INTO accounts (id, balance) VALUES (" + std::to_string(account) + ", " + std::to_string(balance) + ")";//\n WHERE NOT EXISTS (SELECT * FROM accounts WHERE id = " + std::to_string(account) + ")");
-    std::cout << "Query String: " << queryString << "\n";
+    //std::cout << "Query String: " << queryString << "\n";
     pqxx::result r = txn.exec(queryString);
-    std::cout << "About to commit txn!\n";
+    //std::cout << "About to commit txn!\n";
     txn.commit();
     *result = 1; // Set success flag for caller
-    std::cout << "Txn committed!\n";
+    //std::cout << "Txn committed!\n";
     return r;
   }
   else {
@@ -88,18 +87,18 @@ pqxx::result bankDBHandler::updateBalances(unsigned long fromAccount, float from
   pqxx::work txn{c};
   // From
   std::string queryStringFrom("UPDATE accounts SET balance = " + std::to_string(fromBalanceNew) + " WHERE id = " + std::to_string(fromAccount));
-  std::cout << "Updating balance of account no. " << fromAccount;
-  std::cout << "Query String: " << queryStringFrom << "\n";
+  //std::cout << "Updating balance of account no. " << fromAccount;
+  //std::cout << "Query String: " << queryStringFrom << "\n";
   pqxx::result rFrom = txn.exec(queryStringFrom);
   // To
   std::string queryStringTo("UPDATE accounts SET balance = " + std::to_string(toBalanceNew) + " WHERE id = " + std::to_string(toAccount));
-  std::cout << "Updating balance of account no. " << toAccount;
-  std::cout << "Query String: " << queryStringTo << "\n";
+  //std::cout << "Updating balance of account no. " << toAccount;
+  //std::cout << "Query String: " << queryStringTo << "\n";
   pqxx::result rTo = txn.exec(queryStringTo);
-  std::cout << "About to commit txn!\n";
+  //std::cout << "About to commit txn!\n";
   txn.commit();
   *success = 1; // Set success flag for caller
-  std::cout << "Txn committed!\n";
+  //std::cout << "Txn committed!\n";
   return rTo;
 }
 
@@ -138,9 +137,9 @@ pqxx::result bankDBHandler::saveTxn(unsigned long fromAccount, unsigned long toA
   pqxx::work txn{c};
 
   std::string queryString("INSERT INTO txns (f, t, a)\nVALUES\n(" + std::to_string(fromAccount) + ", " + std::to_string(toAccount) + ", " + std::to_string(amount) + ")\nRETURNING txns.id;");
-  std::cout << "Query string:\n" << queryString << "\n";
+  //std::cout << "Query string:\n" << queryString << "\n";
   pqxx::result r = txn.exec(queryString);
-  std::cout << "About to commit txn!\n";
+  //std::cout << "About to commit txn!\n";
 
   unsigned long txnID;
   if (r.size() == 0 || r[0]["ID"].is_null() || !r[0]["ID"].to(txnID)) {
@@ -151,28 +150,71 @@ pqxx::result bankDBHandler::saveTxn(unsigned long fromAccount, unsigned long toA
   // Save Tags, if any
   if (tags.size() > 0) {
 
-    std::string queryString("INSERT INTO tags (tag, txnID) VALUES\n");
+    std::string queryString("INSERT INTO tags (tag, txnid) VALUES\n");
     std::string transferIDStr = std::to_string(txnID);
     for (std::vector<std::string>::iterator it = tags.begin(); it < tags.end() - 1; it ++) {
       std::string tag = *it;
       queryString.append("('" + tag + "', " + transferIDStr + "), ");
     }
     queryString.append("('" + *(tags.end() - 1) + "', " + transferIDStr + ")");
-    std::cout << "Query string:\n" << queryString << "\n";
+    //std::cout << "Query string:\n" << queryString << "\n";
     pqxx::result r = txn.exec(queryString);
     // TO-DO : Check result r of execution?
-    std::cout << "About to commit txn!\n";
+    //std::cout << "About to commit txn!\n";
   }
-  else {
-    std::cout << "No tags to save for this transfer\n";
-  }
+  //else {
+    //std::cout << "No tags to save for this transfer\n";
+  //}
   txn.commit();
   *success = 1; // Set success flag for caller
-  std::cout << "Txn committed!\n";
+  //std::cout << "Txn committed!\n";
+  return r;
+}
+
+pqxx::result bankDBHandler::makeQuery(std::string queryString) {
+  pqxx::connection c{"dbname=bankServer user=radithya"};
+  pqxx::work txn{c};
+  pqxx::result r = txn.exec(queryString);
+
+  //std::cout << "No. of txns found : " << r.size() << "\n";
+  /*
+  for (int txnNo = 0; txnNo < r.size(); txnNo ++) {
+    std::cout << "f: " << r[txnNo]["f"] << "; t: " << r[txnNo]["t"] << "; a" << r[txnNo]["a"] << "; id: " << r[txnNo]["id"] << "\n";
+  }
+  */
+  txn.commit();
   return r;
 }
 /*
 */
+std::vector<std::string> bankDBHandler::getTags(unsigned long txnID) {
+  pqxx::connection c{"dbname=bankServer user=radithya"};
+  pqxx::work txn{c};
+  std::string queryString("SELECT * FROM tags WHERE txnid=" + std::to_string(txnID));
+  //std::cout << "Query String is " << queryString << "\n";
+  pqxx::result r = txn.exec(queryString);
+  std::vector<std::string> tags;
+
+  if (r.size() == 0) {
+    //std::cout << "No tags found for txn " << txnID << "\n";
+  }
+  else {
+    //std::cout << "About to present rows of table\n";
+    for (int row = 0; row < r.size(); row ++) {
+      //std::cout << "Tag: " << r[row]["tag"] << "\n";
+      std::string tagStr;
+      if (!r[row]["tag"].to(tagStr)) {
+        std::cout << "Unable to convert tag field to string; skipping\n";
+        continue;
+      }
+      tags.push_back(tagStr);
+    }
+  }
+  txn.commit();
+  return tags;
+}
+
+
 
 // Validation done beforehand
 // TO-DO : MUST RETURN LATEST BALANCES OF BOTH ACCOUNTS (whether success or failure) SO THAT BANK BACKEND CAN UPDATE ITS CACHE!!! ELSE CACHE INVALIDATED!
@@ -241,4 +283,37 @@ std::tuple<unsigned long, float, unsigned long, float> bankDBHandler::transfer(u
   //*success = 1;
   return std::tuple<unsigned long, float, unsigned long, float>(fromAccount, fromBalance - amount, toAccount, toBalance + amount); // value will be written into cache
   //return updateResult;
+}
+
+
+std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>> bankDBHandler::query(std::string queryString) {
+  std::string txnSelectPrefix("SELECT * FROM txns WHERE ");
+  std::string txnEnd(";");
+  txnSelectPrefix += queryString + txnEnd;
+  pqxx::result queryResult = makeQuery(txnSelectPrefix);
+  std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>> results;
+  unsigned long from, to, id;
+  float amount;
+
+  for (int resultNum = 0; resultNum < queryResult.size(); resultNum ++) {
+    if (!queryResult[resultNum]["f"].to(from)) {
+      std::cout << "Unable to retrieve 'from' field for txn, skipping\n";
+      continue;
+    }
+    if (!queryResult[resultNum]["t"].to(to)) {
+      std::cout << "Unable to retrieve 'to' field for txn, skipping\n";
+      continue;
+    }
+    if (!queryResult[resultNum]["a"].to(amount)) {
+      std::cout << "Unable to retrieve 'amount' field for txn, skipping\n";
+      continue;
+    }
+    if (!queryResult[resultNum]["id"].to(id)) {
+      std::cout << "Unable to retrieve 'amount' field for txn, skipping\n";
+      continue;
+    }  
+    std::vector<std::string> tagsFound = getTags(id);
+    results.push_back(std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>(from, to, amount, tagsFound));
+  }
+  return results;
 }

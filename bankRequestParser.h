@@ -40,6 +40,8 @@ class bankRequestParser {
         //std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<string>*>*>* getTransferReqs(); // can use instead of below line if txn cache is activated
         std::vector<std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>> getTransferReqs();
 
+        std::vector<std::tuple<std::string, std::string>> getQueryReqs();        
+
         bool hasReset();
 
         //void clearRequest();

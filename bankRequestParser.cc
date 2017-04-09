@@ -40,9 +40,10 @@ using namespace xercesc;
             cleanUp();
             return -1;
           }
-          if (parseCreateReqs()) std::cout << "Unable to parse create requests";
-          if (parseBalanceReqs()) std::cout << "Unable to parse balance requests";
-          if (parseTransferReqs()) std::cout << "Unable to parse transfer requests";
+          if (parseCreateReqs()) std::cout << "Unable to parse create requests\n";
+          if (parseBalanceReqs()) std::cout << "Unable to parse balance requests\n";
+          if (parseTransferReqs()) std::cout << "Unable to parse transfer requests\n";
+          if (parseQueryReqs()) std::cout<< "Error while parsing query requests\n";
           return 0;
       }
 
@@ -122,7 +123,7 @@ using namespace xercesc;
         wprintf(L"Node value: %s\n", nodeText);
         const XMLCh* refXML = child->getAttributes()->getNamedItem(XMLString::transcode("ref"))->getTextContent();
         ref = XMLString::transcode(refXML);
-        std::cout << "Ref: " << ref << "\n";
+        //std::cout << "Ref: " << ref << "\n";
         DOMNodeList* grandchildren = child->getChildNodes();
         for (int j = 0; j < grandchildren->getLength(); j ++) {
             DOMNode* infoNode = grandchildren->item(j);
@@ -165,12 +166,12 @@ using namespace xercesc;
         DOMNode* child = balances->item(i);
         DOMNode* refAttrNode;
         if (!(refAttrNode = child->getAttributes()->getNamedItem(XMLString::transcode("ref")))) {
-          std::cout << "Skipping non top-level balance tag\n";
+          //std::cout << "Skipping non top-level balance tag\n";
           continue;
         }
         const XMLCh* refXML = refAttrNode->getTextContent();
         ref = XMLString::transcode(refXML);
-        std::cout << "Ref: " << ref << "\n";
+        //std::cout << "Ref: " << ref << "\n";
         DOMNodeList* grandchildren = child->getChildNodes();
         for (int j = 0; j < grandchildren->getLength(); j ++) {
             DOMNode* infoNode = grandchildren->item(j);
@@ -211,7 +212,7 @@ using namespace xercesc;
         wprintf(L"Node value: %s\n", nodeText);
         const XMLCh* refXML = child->getAttributes()->getNamedItem(XMLString::transcode("ref"))->getTextContent();
         ref = XMLString::transcode(refXML);
-        std::cout << "Ref: " << ref << "\n";
+        //std::cout << "Ref: " << ref << "\n";
         DOMNodeList* grandchildren = child->getChildNodes();
         for (int j = 0; j < grandchildren->getLength(); j ++) {
             DOMNode* infoNode = grandchildren->item(j);
@@ -263,16 +264,17 @@ using namespace xercesc;
     for (int i = 0; i < queries->getLength(); i ++) {
       std::string ref;
       DOMNode* child = queries->item(i);
-      const XMLCh* nodeText = child->getTextContent();
-      wprintf(L"Node value: %s\n", nodeText);
+      //const XMLCh* nodeText = child->getTextContent();
+      //wprintf(L"Node value: %s\n", nodeText);
       const XMLCh* refXML = child->getAttributes()->getNamedItem(XMLString::transcode("ref"))->getTextContent();
       ref = XMLString::transcode(refXML);
-      std::cout << "Ref: " << ref << "\n";
+      //std::cout << "Ref: " << ref << "\n";
       DOMNodeList* grandchildren = child->getChildNodes();
 
       //bool implictAnd = grandchildren->getLength() > 1; // if more than 1 tag directly under <query>, they are implicitly ANDed together
       queryNode* root;
       if (grandchildren->getLength() > 1) { // implicit AND
+        //std::cout << "No. of top-level children of query: " << grandchildren->getLength() << "; implicit AND detected\n";
         root = new queryNode('a');
         for (int childNodeNum = 0; childNodeNum < grandchildren->getLength(); childNodeNum ++) {
           queryNode* rootChild = parseQueryNode(grandchildren->item(childNodeNum));
@@ -287,7 +289,7 @@ using namespace xercesc;
       }
 
       else if (grandchildren->getLength() == 0) { // empty query
-        std::cout << "Empty query tag, treating as TRUE\n";
+        //std::cout << "Empty query tag, treating as TRUE\n";
         queryReqsVec.push_back(std::tuple<std::string, std::string>("TRUE", ref));
         printf("Done with query %d\n", i);
         continue;
@@ -304,7 +306,7 @@ using namespace xercesc;
       }
       else {
         queryString = root->getQueryString();
-        std::cout << "Query String for query number " << i << " of ref " << ref << " is " << queryString << "\n";
+        //std::cout << "Query String for query number " << i << " of ref " << ref << " is " << queryString << "\n";
         deleteQueryNodes(root);
       }
       queryReqsVec.push_back(std::tuple<std::string, std::string>(queryString, ref));      
@@ -318,6 +320,7 @@ using namespace xercesc;
   queryNode* bankRequestParser::parseQueryNode(DOMNode* domNode) {
       queryNode* q;
       const char * nodeName = XMLString::transcode(domNode->getNodeName());
+      //std::cout << "Node name: " << nodeName << "\n";
       char rel;
       char attr;
       if (strcmp(nodeName, "and") == 0) {
@@ -340,6 +343,7 @@ using namespace xercesc;
         DOMNode* attrNode = attrs->item(0);
         const char * attrNodeName = XMLString::transcode(attrNode->getNodeName());
         const char * attrNodeValue = XMLString::transcode(attrNode->getNodeValue());
+        //std::cout << "Attribute value: " << attrNodeValue << "\n";
         std::string val(attrNodeValue);
         if (strcmp(attrNodeName, "from") == 0) {
           attr = 'f';
@@ -368,7 +372,8 @@ using namespace xercesc;
           std::cout << "Invalid relational operator\n";
           return NULL;
         }
-        std::cout << "Adding simple node with query " << q->getQueryString() << "\n";
+        q = new queryNode(rel, val, attr);
+        //std::cout << "Adding simple node with query " << q->getQueryString() << "\n";
         return q;
       }
       // logical operator: add children, and if any child invalid, invalidate entire query tree
@@ -386,12 +391,16 @@ using namespace xercesc;
       return q;
   }
 
+
   void bankRequestParser::deleteQueryNodes(queryNode * q) {
+    /*
     std::vector<queryNode*>* qChildren = q->getChildren();
     for (std::vector<queryNode*>::iterator it = qChildren->begin(); it < qChildren->end(); it ++) {
       deleteQueryNodes(*it);
     }
     q->deleteNode(); // Free memory allocated by q
+    */
+    q->deleteNode();
     delete q;
   }
 
@@ -415,6 +424,10 @@ using namespace xercesc;
   //std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<string>*>*>* bankRequestParser::getTransferReqs() {
   std::vector<std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>> bankRequestParser::getTransferReqs() {
     return transferReqs;
+  }
+
+  std::vector<std::tuple<std::string, std::string>> bankRequestParser::getQueryReqs() {
+    return queryReqs;
   }
 
   bool bankRequestParser::hasReset() {
