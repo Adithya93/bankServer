@@ -128,7 +128,7 @@
 		unsigned long netLongMost4 = ((unsigned long)most4) << (8 * (int)(sizeof(int)));
 		unsigned long netLongLeast4 = ((unsigned long)least4);
 		unsigned long netLong = netLongMost4 | netLongLeast4;
-		std::cout << "Net long: " << netLong << "\n";
+		//std::cout << "Net long: " << netLong << "\n";
 		char* byteChars = (char*)malloc(sizeof(unsigned long) + 1);
 		memset(byteChars, 0, sizeof(unsigned long) + 1);
 		strcpy(byteChars, (char*)&netLong);
@@ -142,7 +142,7 @@
 		unsigned long responseLen = (unsigned long)responseBody.size();
 		std::cout << "Length of response body: " << responseLen << "\n";
 		std::string responseLenStr = hostToNetLong64(responseLen);
-    	std::cout<< "Response length string: " << responseLenStr << "\n";
+    	//std::cout<< "Response length string: " << responseLenStr << "\n";
     	responseLenStr.append(responseBody);
     	return responseLenStr;
 	}

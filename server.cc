@@ -91,7 +91,7 @@ char* readBody(int connfd, unsigned long bodySize) {
 		}
 		if (readNow == 0) { // socket closed?
 			std::cout << "Socket closed prematurely after " << totalRead << " bytes; failing request\n";
-			printf("String buffer so far:\n%s\n", requestBuffer);
+			//printf("String buffer so far:\n%s\n", requestBuffer);
 			free(requestBuffer);
 			return NULL; // incomplete request, don't service
 		}

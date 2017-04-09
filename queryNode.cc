@@ -21,7 +21,7 @@ bool queryNode::addChild(queryNode* child) { // only add if valid, else delete
 	//if (isValid() && child->isValid()) {
 	if (child->isValid()) {
 		this->children->push_back(child);
-		std::cout << "Added child " << child->getString() << " to parent " << getString() << "\n";
+		//std::cout << "Added child " << child->getString() << " to parent " << getString() << "\n";
 		return true;
 	}
 	else {

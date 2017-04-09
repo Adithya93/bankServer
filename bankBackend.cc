@@ -27,12 +27,12 @@ float bankBackend::getBalance(unsigned long account) {
     std::map<unsigned long, float>::iterator it = findAccount(account);
     if (it != cache->end()) { // in cache
         foundBalance = it->second;
-        printf("Current balance of account %lu : %f\n", account, foundBalance);
+        //printf("Current balance of account %lu : %f\n", account, foundBalance);
         return foundBalance;
     }
     // not in cache, check DB
     // TO-DO : will eventually use DB threadpool
-    printf("Account %lu not in cache\n", account);
+    //printf("Account %lu not in cache\n", account);
     pqxx::result getBalanceResult = dbHandler->getBalance(account);
     if (getBalanceResult.size() == 0 || getBalanceResult[0]["balance"].is_null()) { // not in DB either, must be non-existent account
         return -1;
@@ -46,18 +46,18 @@ bool bankBackend::setBalance(unsigned long account, float balance, bool reset) {
     std::map<unsigned long, float>::iterator it = findAccount(account);
     if (it != cache->end()) { // account exists
         if (!reset) { // account already exists and not a reset, do not update
-            printf("Account %lu already exists, ignoring\n", account);
+            //printf("Account %lu already exists, ignoring\n", account);
             return false;
         }
         // updating existing account's balance; update DB and write to cache to speed up future reads ('balance' requests)
         it->second = balance;
-        printf("Overwrote account %lu's balance to %f\n", it->first, it->second);
+        //printf("Overwrote account %lu's balance to %f\n", it->first, it->second);
         // Write-through to database after this
     }
     
     else { // new account; update DB and write to cache to speed up future reads ('balance' requests)     
         std::pair<std::map<unsigned long, float>::iterator, bool> inserted = cache->insert(std::pair<unsigned long, float>(account, balance));
-        printf("Created new account %lu with balance %f\n", inserted.first->first, inserted.first->second);
+        //printf("Created new account %lu with balance %f\n", inserted.first->first, inserted.first->second);
         // Write-through to database after this
     }
     int commitSuccess = 0;

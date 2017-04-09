@@ -83,9 +83,9 @@ using namespace xercesc;
       }
       const XMLCh* rootTagName = root->getTagName();
       const char * rootTagNameChar = XMLString::transcode(rootTagName);
-      printf("Root tag name: %s\n", rootTagNameChar);
+      //printf("Root tag name: %s\n", rootTagNameChar);
       if (strcmp(rootTagNameChar, "transactions") != 0) {
-        printf("Invalid top-level tag of %s\n", rootTagNameChar);
+        //printf("Invalid top-level tag of %s\n", rootTagNameChar);
         return -1;
       }
       const XMLCh* rootAttrName = XMLString::transcode("reset");
@@ -94,7 +94,7 @@ using namespace xercesc;
       const XMLCh* rootValue = rootAttr->getValue();
       const char* rootValueChar = XMLString::transcode(rootValue);
       //wprintf(L"Attribute name: %s; Attribute value: %s\n", , XMLString::transcode(rootValue));
-      printf("Reset attribute value: %s\n", rootValueChar);
+      //printf("Reset attribute value: %s\n", rootValueChar);
       if (strcmp(rootValueChar, "true") == 0) {
         reset = true;
       }
@@ -107,7 +107,7 @@ using namespace xercesc;
 
   int bankRequestParser::parseCreateReqs() {
     DOMNodeList* creations = root->getElementsByTagName(XMLString::transcode("create"));
-    printf("No. of creations: %lu\n", creations->getLength());
+    //printf("No. of creations: %lu\n", creations->getLength());
     //iterate through DOMNodes
     //std::vector<std::tuple<unsigned long, float, bool, std::string>*>* createReqsVec;// = new std::vector<std::tuple<unsigned long, float, bool, std::string>*>(); // exception-safety? :(
     std::vector<std::tuple<unsigned long, float, bool, std::string>> createReqsVec;
@@ -120,7 +120,7 @@ using namespace xercesc;
 
         DOMNode* child = creations->item(i);
         const XMLCh* nodeText = child->getTextContent();
-        wprintf(L"Node value: %s\n", nodeText);
+        //wprintf(L"Node value: %s\n", nodeText);
         const XMLCh* refXML = child->getAttributes()->getNamedItem(XMLString::transcode("ref"))->getTextContent();
         ref = XMLString::transcode(refXML);
         //std::cout << "Ref: " << ref << "\n";
@@ -130,14 +130,14 @@ using namespace xercesc;
             const char * nodeName = XMLString::transcode(infoNode->getNodeName());
             const char * nodeValue = XMLString::transcode(infoNode->getTextContent());
             if (strcmp(nodeName, "account") == 0) {
-                printf("Account Found. %s : %s\n", nodeName, nodeValue);
+                //printf("Account Found. %s : %s\n", nodeName, nodeValue);
                 if (!(account = strtoul(nodeValue, NULL, 10))) { // strtoul returns 0, invalid formatting of account num
                   printf("Invalid formatting of account number in create request: %s\n", nodeValue);
                   // continue processing other creates in this request instead of returning error
                 }
             }
             else if (strcmp(nodeName, "balance") == 0) {
-                printf("Balance Found. %s : %s\n", nodeName, nodeValue);
+                //printf("Balance Found. %s : %s\n", nodeName, nodeValue);
                 try {
                   balance = std::stof(nodeValue);
                 }
@@ -148,7 +148,7 @@ using namespace xercesc;
             } 
         }
         createReqsVec.push_back(std::tuple<unsigned long, float, bool, std::string>(account, balance, reset, ref));
-        printf("Done with creation %d\n", i);
+        //printf("Done with creation %d\n", i);
     }
     createReqs = createReqsVec;
     return 0;
@@ -157,7 +157,7 @@ using namespace xercesc;
 
   int bankRequestParser::parseBalanceReqs() {
     DOMNodeList* balances = root->getElementsByTagName(XMLString::transcode("balance"));
-    printf("No. of balances: %lu\n", balances->getLength());
+    //printf("No. of balances: %lu\n", balances->getLength());
     std::vector<std::tuple<unsigned long, std::string>> balanceReqsVec;
     for (int i = 0; i < balances->getLength(); i ++) {
         unsigned long account = 0;
@@ -178,7 +178,7 @@ using namespace xercesc;
             const char * nodeName = XMLString::transcode(infoNode->getNodeName());
             const char * nodeValue = XMLString::transcode(infoNode->getTextContent());
             if (strcmp(nodeName, "account") == 0) {
-                printf("Account Found. %s : %s\n", nodeName, nodeValue);
+                //printf("Account Found. %s : %s\n", nodeName, nodeValue);
                 if (!(account = strtoul(nodeValue, NULL, 10))) { // strtoul returns 0, invalid formatting of account num
                   printf("Invalid formatting of account number in create request: %s\n", nodeValue);
                   // continue processing other creates in this request instead of returning error
@@ -186,7 +186,7 @@ using namespace xercesc;
             }
         }
         balanceReqsVec.push_back(std::tuple<unsigned long, std::string>(account, ref));
-        printf("Done with creation %d\n", i);
+        //printf("Done with creation %d\n", i);
     }
     balanceReqs = balanceReqsVec;
     return 0;
@@ -194,7 +194,7 @@ using namespace xercesc;
 
   int bankRequestParser::parseTransferReqs() {
     DOMNodeList* transfers = root->getElementsByTagName(XMLString::transcode("transfer"));
-    printf("No. of transfers: %lu\n", transfers->getLength());
+    //printf("No. of transfers: %lu\n", transfers->getLength());
     //iterate through DOMNodes
     //std::vector<std::tuple<unsigned long, float, bool, std::string>*>* createReqsVec;// = new std::vector<std::tuple<unsigned long, float, bool, std::string>*>(); // exception-safety? :(
     std::vector<std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>> transferReqsVec;
@@ -209,7 +209,7 @@ using namespace xercesc;
 
         DOMNode* child = transfers->item(i);
         const XMLCh* nodeText = child->getTextContent();
-        wprintf(L"Node value: %s\n", nodeText);
+        //wprintf(L"Node value: %s\n", nodeText);
         const XMLCh* refXML = child->getAttributes()->getNamedItem(XMLString::transcode("ref"))->getTextContent();
         ref = XMLString::transcode(refXML);
         //std::cout << "Ref: " << ref << "\n";
@@ -219,21 +219,21 @@ using namespace xercesc;
             const char * nodeName = XMLString::transcode(infoNode->getNodeName());
             const char * nodeValue = XMLString::transcode(infoNode->getTextContent());
             if (strcmp(nodeName, "from") == 0) {
-                printf("fromAccount Found. %s : %s\n", nodeName, nodeValue);
+                //printf("fromAccount Found. %s : %s\n", nodeName, nodeValue);
                 if (!(fromAccount = strtoul(nodeValue, NULL, 10))) { // strtoul returns 0, invalid formatting of account num
-                  printf("Invalid formatting of account number in transfer request: %s\n", nodeValue);
+                  //printf("Invalid formatting of account number in transfer request: %s\n", nodeValue);
                   // continue processing other creates in this request instead of returning error
                 }
             }
             else if (strcmp(nodeName, "to") == 0) {
-                printf("toAccount Found. %s : %s\n", nodeName, nodeValue);
+                //printf("toAccount Found. %s : %s\n", nodeName, nodeValue);
                 if (!(toAccount = strtoul(nodeValue, NULL, 10))) { // strtoul returns 0, invalid formatting of account num
-                  printf("Invalid formatting of account number in transfer request: %s\n", nodeValue);
+                  //printf("Invalid formatting of account number in transfer request: %s\n", nodeValue);
                   // continue processing other creates in this request instead of returning error
                 }
             }
             else if (strcmp(nodeName, "amount") == 0) {
-                printf("Amount Found. %s : %s\n", nodeName, nodeValue);
+                //printf("Amount Found. %s : %s\n", nodeName, nodeValue);
                 try {
                   amount = std::stof(nodeValue);
                 }
@@ -243,12 +243,12 @@ using namespace xercesc;
                 }
             }
             else if (strcmp(nodeName, "tag") == 0) {
-              printf("Tag found. %s : %s\n", nodeName, nodeValue);
+              //printf("Tag found. %s : %s\n", nodeName, nodeValue);
               tags.push_back(std::string(nodeValue));
             } 
         }
         transferReqsVec.push_back(std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>(fromAccount, toAccount, amount, ref, tags));
-        printf("Done with transfer %d\n", i);
+        //printf("Done with transfer %d\n", i);
     }
     transferReqs = transferReqsVec;
     return 0;
@@ -257,7 +257,7 @@ using namespace xercesc;
 
   int bankRequestParser::parseQueryReqs() {
     DOMNodeList* queries = root->getElementsByTagName(XMLString::transcode("query"));
-    printf("No. of queries: %lu\n", queries->getLength());
+    //printf("No. of queries: %lu\n", queries->getLength());
     //iterate through DOMNodes
     std::vector<std::tuple<std::string, std::string>> queryReqsVec;
     int hasError = 0;
@@ -291,7 +291,7 @@ using namespace xercesc;
       else if (grandchildren->getLength() == 0) { // empty query
         //std::cout << "Empty query tag, treating as TRUE\n";
         queryReqsVec.push_back(std::tuple<std::string, std::string>("TRUE", ref));
-        printf("Done with query %d\n", i);
+        //printf("Done with query %d\n", i);
         continue;
       }
       
@@ -310,7 +310,7 @@ using namespace xercesc;
         deleteQueryNodes(root);
       }
       queryReqsVec.push_back(std::tuple<std::string, std::string>(queryString, ref));      
-      printf("Done with query %d\n", i);
+      //printf("Done with query %d\n", i);
     }
     queryReqs = queryReqsVec;
     return hasError;
