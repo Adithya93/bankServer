@@ -5,6 +5,7 @@
 		this->args = args;
 		active = true;
 		totalServiced = 0;
+		peakQueueLength = 0;
 		for (int workerNum = 0; workerNum < size; workerNum ++) {
 			workers.push_back(new std::thread(&threadPool::dequeueRequest, this));
 		}
@@ -20,6 +21,9 @@
 		requests.push_front(connfd);
 		// signal
 		queueCV.notify_one();
+		if (requests.size() > peakQueueLength) {
+			peakQueueLength = requests.size();
+		}
 		// unlock
 		queueLock.unlock();
 	}
@@ -43,7 +47,7 @@
 				// execute func
 				task(requestFd);
 				threadServiced ++;
-				std::cout << "Thread has now serviced " << threadServiced << " requests\n";
+				std::cout << "Thread " << std::this_thread::get_id() << " has now serviced " << threadServiced << " requests\n";
 			}
 			else {
 				std::cout << "Thread awakened to exit\n";
@@ -85,5 +89,6 @@
 			delete(*it);
 		}
 		std::cout << "Threadpool serviced a total of " << totalServiced << " requests. Deallocated all threadpool memory. Exiting.\n";
+		std::cout << "Peak queue length: " << peakQueueLength << "\n";
 		return totalServiced;
 	}

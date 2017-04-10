@@ -31,5 +31,6 @@ class threadPool {
 		std::condition_variable exitCV;
 		int totalServiced;
 		int liveThreads;
+		int peakQueueLength;
 
 };
