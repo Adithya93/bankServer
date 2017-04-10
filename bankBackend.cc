@@ -16,16 +16,19 @@ void bankBackend::cleanUp() {
     delete dbHandler;
 }
 
-std::map<unsigned long, float>::iterator bankBackend::findAccount(unsigned long account) {
-    return cache->find(account);
+std::tuple<std::map<unsigned long, float>::iterator, bool> bankBackend::findAccount(unsigned long account) { // return tuple so that caller doesn't have to reacquire lock
+    std::lock_guard<std::mutex> guard(cacheMutex);
+    std::map<unsigned long, float>::iterator it = cache->find(account);
+    return std::tuple<std::map<unsigned long, float>::iterator, bool>(it, it == cache->end()); // should automatically unlock as the lock guard goes out of scope
 }
 
 // for balance queries
 float bankBackend::getBalance(unsigned long account) {
     // if in cache, return cached value
     float foundBalance;
-    std::map<unsigned long, float>::iterator it = findAccount(account);
-    if (it != cache->end()) { // in cache
+    std::tuple<std::map<unsigned long, float>::iterator, bool> cacheTup = findAccount(account);
+    std::map<unsigned long, float>::iterator it = std::get<0>(cacheTup);
+    if (!std::get<1>(cacheTup)) { // in cache
         foundBalance = it->second;
         //printf("Current balance of account %lu : %f\n", account, foundBalance);
         return foundBalance;
@@ -43,19 +46,22 @@ float bankBackend::getBalance(unsigned long account) {
 
 // for creating/resetting accounts and transfers
 bool bankBackend::setBalance(unsigned long account, float balance, bool reset) {
-    std::map<unsigned long, float>::iterator it = findAccount(account);
-    if (it != cache->end()) { // account exists
+    std::tuple<std::map<unsigned long, float>::iterator, bool> cacheTup = findAccount(account);
+    std::map<unsigned long, float>::iterator it = std::get<0>(cacheTup);
+    if (!std::get<1>(cacheTup)) { // account in cache
         if (!reset) { // account already exists and not a reset, do not update
             //printf("Account %lu already exists, ignoring\n", account);
             return false;
         }
         // updating existing account's balance; update DB and write to cache to speed up future reads ('balance' requests)
+        std::lock_guard<std::mutex> guard(cacheMutex);
         it->second = balance;
         //printf("Overwrote account %lu's balance to %f\n", it->first, it->second);
         // Write-through to database after this
     }
     
     else { // new account; update DB and write to cache to speed up future reads ('balance' requests)     
+        std::lock_guard<std::mutex> guard(cacheMutex);
         std::pair<std::map<unsigned long, float>::iterator, bool> inserted = cache->insert(std::pair<unsigned long, float>(account, balance));
         //printf("Created new account %lu with balance %f\n", inserted.first->first, inserted.first->second);
         // Write-through to database after this
@@ -73,12 +79,11 @@ bool bankBackend::setBalance(unsigned long account, float balance, bool reset) {
 
 
 // for transfers
-//void bankBackend::saveTransfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string>* tags) {
-//bool bankBackend::saveTransfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags) {
 int bankBackend::saveTransfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags) {
     int transferSuccess = 0;
     std::tuple<unsigned long, float, unsigned long, float> newBalances = dbHandler->transfer(fromAccount, toAccount, amount, tags, &transferSuccess);
     if (transferSuccess == 1) { // update cache
+        std::lock_guard<std::mutex> guard(cacheMutex);
         cache->insert(std::pair<unsigned long, float>(std::get<0>(newBalances), std::get<1>(newBalances)));
         cache->insert(std::pair<unsigned long, float>(std::get<2>(newBalances), std::get<3>(newBalances)));
     }
@@ -87,8 +92,6 @@ int bankBackend::saveTransfer(unsigned long fromAccount, unsigned long toAccount
 }
 
 // for transfers
-//bool bankBackend::transfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string>* tags) {
-//bool bankBackend::transfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags) {
 int bankBackend::transfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags) {
     /* NO POINT CHECKING IN CACHE FOR THIS
     */
@@ -122,7 +125,6 @@ std::vector<std::tuple<float, std::string>> bankBackend::getBalances(std::vector
 }
 
 // Same as above, for all transfers in a request
-//std::vector<std::tuple<bool, std::string>> bankBackend::doTransfers(std::vector<std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>> transferReqs) {
 std::vector<std::tuple<int, std::string>> bankBackend::doTransfers(std::vector<std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>> transferReqs) {
     //std::vector<std::tuple<bool, std::string>> resultVec;
     std::vector<std::tuple<int, std::string>> resultVec;

@@ -3,6 +3,9 @@
 #include <unordered_set>
 #include <vector>
 #include <queue>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
 #include "./bankDBHandler.h"
 
 class bankBackend {
@@ -41,10 +44,11 @@ class bankBackend {
 
     private:
         // helper method
-        std::map<unsigned long, float>::iterator findAccount(unsigned long account);
+        std::tuple<std::map<unsigned long, float>::iterator, bool> findAccount(unsigned long account);
         std::map<unsigned long, float>* cache; // KIV : Eviction Policy/LRU ? Can use deque to track LRU account / LRU transfer ptr
         //std::unordered_set<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>*>*>* transactions;
         bankDBHandler* dbHandler;
+        std::mutex  cacheMutex;
 
 
 }; 
