@@ -10,6 +10,9 @@
 #include <unistd.h>
 #include <xercesc/util/PlatformUtils.hpp>
 #include <stdint.h>
+#include <signal.h>
+#include <future>
+#include <time.h>
 #include "./bankRequestParser.h"
 #include "./bankBackend.h"
 #include "./bankResponseWriter.h"
@@ -25,6 +28,8 @@ int BAD_RESPONSE_LEN = (int)strlen(BAD_RESPONSE);
 
 int POOL_SIZE = 10;
 bankBackend* backend;
+threadPool* pool;
+int listenFd;
 
 int bindAndListen(int port, int backlog) {
 	// initialize socket
@@ -128,42 +133,107 @@ void serviceRequest(int connfd) {
 	bankResponseWriter writer;
 	std::string errorResponse = writer.getParseErrorResponse(); // should find a way to avoid repetition
 	char * reqBuffer;
+	clock_t start;
+	clock_t end;
+	clock_t t;
+  	start = clock();
 	if ((reqBuffer = readRequest(connfd))) {
+		end = clock();
+		t = end - start;
+		std::cout << "Time elapsed reading request: " << t << " clicks; " << (((float)t)/CLOCKS_PER_SEC) << " secs\n";
 		// hand over to parser -> eventually either a separate thread, or a threadpool, etc
+		start = clock();
 		parser.initialize(reqBuffer, (unsigned long)strlen(reqBuffer));
+		end = clock();
+		t = end - start;
+		std::cout << "Time elapsed initializing parser: " << t << " clicks; " << (((float)t)/CLOCKS_PER_SEC) << " secs\n";
+	    start = clock();
 	    if (parser.parseRequest()) { // parser returned error while reading document
 	    	std::cout << "Unable to parse request, must be badly formed.\n";
 	    	// should return error xml
 			respond(connfd, errorResponse.c_str(), (int)errorResponse.size());			    	
 	    }
 	    else { // creates, balances, transfers and queries for this request are all available now
+		    end = clock();
+		    t = end - start;
+		    std::cout << "Time elapsed parsing DOM: " << t << " clicks; " << (((float)t)/CLOCKS_PER_SEC) << " secs\n";
+		    start = clock();
+		    std::vector<std::tuple<unsigned long, float, bool, std::string>> createReqs = parser.getCreateReqs();
+		    std::vector<std::tuple<unsigned long, std::string>> balanceReqs = parser.getBalanceReqs();
+		    std::vector<std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>> transferReqs = parser.getTransferReqs();
+		    std::vector<std::tuple<std::string, std::string>> queryReqs = parser.getQueryReqs();
+		    end = clock();
+		    t = end - start;
+		    std::cout << "Time elapsed copying parse data: " << t << " clicks; " << (((float)t)/CLOCKS_PER_SEC) << " secs\n";
+		    /*
 		    std::vector<std::tuple<bool, std::string>> createResults = backend->createAccounts(parser.getCreateReqs());
 		    std::vector<std::tuple<float, std::string>> balanceResults = backend->getBalances(parser.getBalanceReqs());
 		    std::vector<std::tuple<int, std::string>> transferResults = backend->doTransfers(parser.getTransferReqs());
 		    std::vector<std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>> queryResults = backend->doQueries(parser.getQueryReqs());
-
+			*/
+			start = clock();
+			//std::vector<std::tuple<bool, std::string>> createResults = backend->createAccounts(createReqs);
+			std::future<std::vector<std::tuple<bool, std::string>>> createResultsFuture = std::async(&bankBackend::createAccounts, backend, createReqs);
+			//std::vector<std::tuple<float, std::string>> balanceResults = backend->getBalances(balanceReqs);
+			std::future<std::vector<std::tuple<float, std::string>>> balanceResultsFuture = std::async(&bankBackend::getBalances, backend, balanceReqs);
+			//std::vector<std::tuple<int, std::string>> transferResults = backend->doTransfers(transferReqs);
+			std::future<std::vector<std::tuple<int, std::string>>> transferResultsFuture = std::async(&bankBackend::doTransfers, backend, transferReqs);
+			//std::vector<std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>> queryResults = backend->doQueries(queryReqs);
+			std::future<std::vector<std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>>> queryResultsFuture = std::async(&bankBackend::doQueries, backend, queryReqs);
+			//start = clock()
+			//std::cout << "Launched async tasks, waiting on them\n";
+			std::vector<std::tuple<bool, std::string>> createResults = createResultsFuture.get();
+			std::vector<std::tuple<float, std::string>> balanceResults = balanceResultsFuture.get();
+			std::vector<std::tuple<int, std::string>> transferResults = transferResultsFuture.get();
+			std::vector<std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>> queryResults = queryResultsFuture.get();
+			end = clock();
+			t = end - start;
+		    std::cout << "Time elapsed on cache and database: " << t << " clicks; " << (((float)t)/CLOCKS_PER_SEC) << " secs\n";
+		    start = clock();
 		    std::string successResponse = writer.constructResponse(&createResults, &balanceResults, &transferResults, &queryResults);
+		    end = clock();
+		    t = end - start;
+		    std::cout << "Time elapsed constructing XML data string: " << t << " clicks; " << (((float)t)/CLOCKS_PER_SEC) << " secs\n";
+		    start = clock();
 		    respond(connfd, successResponse.c_str(), (int)successResponse.size());
+			end = clock();
+			t = end - start;
+		    std::cout << "Time elapsed writing out data to socket: " << t << " clicks; " << (((float)t)/CLOCKS_PER_SEC) << " secs\n";
 		}
 	    //delete test;
 	    parser.cleanUp(); // done with request, clean up all XMLParsing resources
 		free(reqBuffer);
 	}
 	else { // bad request
-		//respondToMissingHeader(connfd);
 		respond(connfd, errorResponse.c_str(), (int)errorResponse.size());
 	}
 	close(connfd);
-	//free(reqBuffer);
 }
 
+void cleanUp() {
+	std::cout << "Main thread about to clean up\n";
+	backend->cleanUp();
+	delete backend;
+	int totalServiced = pool->shutdown(); // Allow threadpool to reclaim its resources
+	std::cout << "Total requests serviced : " << totalServiced << "\n";
+	delete pool;
+	close(listenFd);
+	XMLPlatformUtils::Terminate();
+	exit(1);
+}
+
+void handleSignal(int num) {
+	std::cout << "Handling signal";
+	cleanUp();
+}
 
 int main() {
 	std::cout << "Booyakasha C++!\n";
-	int listenFd = bindAndListen(8000, 10);
+	listenFd = bindAndListen(8000, 10);
 	int connfd;
 	struct sockaddr_in cliaddr;
 	socklen_t len;
+	signal(SIGINT, handleSignal); // Register signal handler
 	int handled = 0;
 	try {
         XMLPlatformUtils::Initialize();
@@ -177,8 +247,9 @@ int main() {
     }
     backend = new bankBackend(); // cache shared among threads
     std::cout << "About to spawn threads\n";
-    threadPool* pool = new threadPool(POOL_SIZE, &serviceRequest); // threads created and waiting for requests
-	while(1) {
+    pool = new threadPool(POOL_SIZE, &serviceRequest); // threads created and waiting for requests
+	//while(running) {
+	while (1) {
 		if ((connfd = accept(listenFd, (struct sockaddr *)&cliaddr, &len)) == -1) {
 			perror("Unable to accept connection");
   		}
@@ -187,13 +258,5 @@ int main() {
 			pool->enqueueRequest(connfd); // Will be picked up by threads of pool
 		}
 	}
-	backend->cleanUp();
-	delete backend;
-	int totalServiced = pool->shutdown();
-	std::cout << "Total requests serviced : " << totalServiced;
-	delete pool;
-	close(listenFd);
-	XMLPlatformUtils::Terminate();
-	return 0;
 }
 
