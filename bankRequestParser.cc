@@ -101,6 +101,7 @@ using namespace xercesc;
       else {
         reset = false;
       }
+      std::cout << "Verified parse validity!\n";
       return 0;
     }
   }
@@ -254,13 +255,38 @@ using namespace xercesc;
     return 0;
   }
 
+/*
+  int actualNodeCount(DOMNode* d) {
+    int actual = 0;
+    for (int i = 0; i < d->getChildNodes()->getLength(); i ++) {
+      if (strcmp(XMLString::transcode(d->getChildNodes()->item(i)->getNodeName()), "#text") != 0) {
+        actual ++;
+      }
+    }
+    return actual;
+  }
+*/
+
+  std::vector<DOMNode*> actualNodes(DOMNode* d) {
+    std::vector<DOMNode*> goodNodes;
+    for (int i = 0; i < d->getChildNodes()->getLength(); i ++) {
+      if (strcmp(XMLString::transcode(d->getChildNodes()->item(i)->getNodeName()), "#text") != 0) {
+        goodNodes.push_back(d->getChildNodes()->item(i));
+      }
+    }
+    return goodNodes;
+  }
+
 
   int bankRequestParser::parseQueryReqs() {
+    std::cout << "About to parse query requests!\n";
     DOMNodeList* queries = root->getElementsByTagName(XMLString::transcode("query"));
     //printf("No. of queries: %lu\n", queries->getLength());
     //iterate through DOMNodes
     std::vector<std::tuple<std::string, std::string>> queryReqsVec;
     int hasError = 0;
+    std::cout << "No. of queries: " << queries->getLength();
+    std::cout << "About to iterate through queries\n";
     for (int i = 0; i < queries->getLength(); i ++) {
       std::string ref;
       DOMNode* child = queries->item(i);
@@ -271,13 +297,33 @@ using namespace xercesc;
       //std::cout << "Ref: " << ref << "\n";
       DOMNodeList* grandchildren = child->getChildNodes();
 
+      if (!grandchildren) {
+        std::cout << "Grandchildren NULL!\n";
+      }
       //bool implictAnd = grandchildren->getLength() > 1; // if more than 1 tag directly under <query>, they are implicitly ANDed together
       queryNode* root;
-      if (grandchildren->getLength() > 1) { // implicit AND
+      //if (grandchildren->getLength() > 1) { // implicit AND
+      //int actualCount = actualNodeCount(child);
+      std::vector<DOMNode*> actuals = actualNodes(child);
+      //if (actualCount > 1) {
+      if (actuals.size() > 1) {
         //std::cout << "No. of top-level children of query: " << grandchildren->getLength() << "; implicit AND detected\n";
+        std::cout << "No. of top-level children of query: " << actuals.size() << "; implicit AND detected\n";
+        
         root = new queryNode('a');
-        for (int childNodeNum = 0; childNodeNum < grandchildren->getLength(); childNodeNum ++) {
-          queryNode* rootChild = parseQueryNode(grandchildren->item(childNodeNum));
+        //for (int childNodeNum = 0; childNodeNum < grandchildren->getLength(); childNodeNum ++) {
+        for (std::vector<DOMNode*>::iterator it = actuals.begin(); it < actuals.end(); it ++) {
+        /*
+          if (strcmp(XMLString::transcode(grandchildren->item(childNodeNum)->getNodeName()), "#text") == 0) {
+            std::cout << "Skipping lame node\n";
+            continue;
+          }
+        */
+          DOMNode* grandchild = *it;
+          //std::cout << "Testing Node name: " << XMLString::transcode(grandchildren->item(childNodeNum)->getNodeName()) << "\n";
+          std::cout << "Testing Node name: " << XMLString::transcode(grandchild->getNodeName()) << "\n";
+          //queryNode* rootChild = parseQueryNode(grandchildren->item(childNodeNum));
+          queryNode* rootChild = parseQueryNode(grandchild);
           if (!rootChild) {
             deleteQueryNodes(root);
             root = NULL;
@@ -288,7 +334,9 @@ using namespace xercesc;
         }
       }
 
-      else if (grandchildren->getLength() == 0) { // empty query
+      //else if (grandchildren->getLength() == 0) { // empty query
+      //else if (actualCount == 0) { 
+      else if (actuals.size() == 0) {
         //std::cout << "Empty query tag, treating as TRUE\n";
         queryReqsVec.push_back(std::tuple<std::string, std::string>("TRUE", ref));
         //printf("Done with query %d\n", i);
@@ -296,7 +344,9 @@ using namespace xercesc;
       }
       
       else { // get tag name of top-level tag within query
-        root = parseQueryNode(grandchildren->item(0));
+        std::cout << "Exactly 1 top-level operator for this query\n";
+        //root = parseQueryNode(grandchildren->item(0));
+        root = parseQueryNode(actuals.front());
       }
       std::string queryString;
       if (!root) {
@@ -306,7 +356,7 @@ using namespace xercesc;
       }
       else {
         queryString = root->getQueryString();
-        //std::cout << "Query String for query number " << i << " of ref " << ref << " is " << queryString << "\n";
+        std::cout << "Query String for query number " << i << " of ref " << ref << " is " << queryString << "\n";
         deleteQueryNodes(root);
       }
       queryReqsVec.push_back(std::tuple<std::string, std::string>(queryString, ref));      
@@ -375,18 +425,26 @@ using namespace xercesc;
         q = new queryNode(rel, val, attr);
         //std::cout << "Adding simple node with query " << q->getQueryString() << "\n";
         return q;
-      }
+    }
       // logical operator: add children, and if any child invalid, invalidate entire query tree
       q = new queryNode(rel);
       DOMNodeList* nodeChildren = domNode->getChildNodes();
-      for (int childNum = 0; childNum < nodeChildren->getLength(); childNum ++) {
-        queryNode * childQueryNode = parseQueryNode(nodeChildren->item(childNum));
-        if (!childQueryNode) {
-          // free all resources and return NULL
-          deleteQueryNodes(q); // q freed
-          return NULL;
+      if (nodeChildren) {
+        std::vector<DOMNode*> actualChildren = actualNodes(domNode);
+        //for (int childNum = 0; childNum < nodeChildren->getLength(); childNum ++) {
+        for (std::vector<DOMNode*>::iterator it = actualChildren.begin(); it < actualChildren.end(); it ++) {
+          //queryNode * childQueryNode = parseQueryNode(nodeChildren->item(childNum));
+          queryNode* childQueryNode = parseQueryNode(*it);
+          if (!childQueryNode) {
+            // free all resources and return NULL
+            deleteQueryNodes(q); // q freed
+            return NULL;
+          }
+          q->addChild(childQueryNode);
         }
-        q->addChild(childQueryNode);
+      }
+      else {
+        std::cout << "Children is null!\n";
       }
       return q;
   }

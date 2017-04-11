@@ -54,7 +54,7 @@ int bindAndListen(int port, int backlog) {
 	std::cout << "Listening on socket " << listenFd << "\n";
 	return listenFd;
 }
-
+/*
 void printByteByByte(char * ptr) {
 	char * endPtr = ptr + 8;
 	char * readPtr = ptr;
@@ -63,13 +63,12 @@ void printByteByByte(char * ptr) {
 		printf("Byte: %2X\n", *readPtr++);
 	}
 }
+*/
 
 // ntohl is for 32 bits, but unsigned long is 64 bits, so this helper is used here instead for network long to host long
 unsigned long netToHostLong64(char * ptr) {
 	//printf("Header buff: %s\n", ptr);
-	printByteByByte(ptr);
-
-
+	//printByteByByte(ptr);
 	unsigned long * docSizePtr = (unsigned long *)ptr;
 	unsigned long docSize = *docSizePtr;
 	unsigned int docSizeMost4 = ntohl((uint32_t)*docSizePtr);

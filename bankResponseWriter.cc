@@ -39,7 +39,7 @@
 
 	std::string bankResponseWriter::querySuccessResponse(std::string ref, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>* queryResults) {
 		//std::cout << "Appending successful query result\n";
-		std::string header("<results ref=" + ref + "\">\n");
+		std::string header("<results ref=\"" + ref + "\">\n");
 		std::string footer("</results>\n");
 		std::string body;
 		for (std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>::iterator it = queryResults->begin(); it < queryResults->end(); it ++) {

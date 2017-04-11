@@ -93,7 +93,7 @@ bool queryNode::isValid() {
 	return false;
 	*/
 	// Below One-Liner is equivalent to commented-out code above
-	return subTreeValid && ((logical && (((rel == 'n') && (children->size() == 1)) ||  (((rel == 'a') || (rel == 'o')) && (children->size() != 1)))) || (!logical && ((rel == '>') || (rel == '<') || (rel == '=')) && ((attr == 'f') || (attr == 't') || (attr == 'a'))));
+	return subTreeValid && ((logical && (((rel == 'n') && (children->size() < 2)) ||  (((rel == 'a') || (rel == 'o')) && (children->size() != 1)))) || (!logical && ((rel == '>') || (rel == '<') || (rel == '=')) && ((attr == 'f') || (attr == 't') || (attr == 'a'))));
 }
 
 std::string queryNode::getQueryString() { // in-order traversal; should only be called after children have been added

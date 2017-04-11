@@ -31,6 +31,7 @@ float bankBackend::getBalance(unsigned long account) {
     if (!std::get<1>(cacheTup)) { // in cache
         foundBalance = it->second;
         //printf("Current balance of account %lu : %f\n", account, foundBalance);
+        std::cout << "Returning cached value of " << foundBalance << " for account " << account << "\n";
         return foundBalance;
     }
     // not in cache, check DB
@@ -45,7 +46,7 @@ float bankBackend::getBalance(unsigned long account) {
 }
 
 // for creating/resetting accounts and transfers
-bool bankBackend::setBalance(unsigned long account, float balance, bool reset) {
+bool bankBackend::setBalance(unsigned long account, float balance, bool reset, bool writtenToDB) {
     std::tuple<std::map<unsigned long, float>::iterator, bool> cacheTup = findAccount(account);
     std::map<unsigned long, float>::iterator it = std::get<0>(cacheTup);
     if (!std::get<1>(cacheTup)) { // account in cache
@@ -66,6 +67,11 @@ bool bankBackend::setBalance(unsigned long account, float balance, bool reset) {
         //printf("Created new account %lu with balance %f\n", inserted.first->first, inserted.first->second);
         // Write-through to database after this
     }
+    if (writtenToDB) {
+        std::cout << "Already written to DB, returning success\n";
+        return true;
+    }
+
     int commitSuccess = 0;
     pqxx::result setBalanceResult = dbHandler->saveAccount(account, balance, reset, &commitSuccess);
     if (!commitSuccess) { // writing to DB failed
@@ -83,9 +89,14 @@ int bankBackend::saveTransfer(unsigned long fromAccount, unsigned long toAccount
     int transferSuccess = 0;
     std::tuple<unsigned long, float, unsigned long, float> newBalances = dbHandler->transfer(fromAccount, toAccount, amount, tags, &transferSuccess);
     if (transferSuccess == 1) { // update cache
-        std::lock_guard<std::mutex> guard(cacheMutex);
-        cache->insert(std::pair<unsigned long, float>(std::get<0>(newBalances), std::get<1>(newBalances)));
-        cache->insert(std::pair<unsigned long, float>(std::get<2>(newBalances), std::get<3>(newBalances)));
+        //std::lock_guard<std::mutex> guard(cacheMutex);
+        std::cout << "Updating cache for account " << std::get<0>(newBalances) << " to have value of " << std::get<1>(newBalances) << "\n";
+        std::cout << "Updating cache for account " << std::get<2>(newBalances) << " to have value of " << std::get<3>(newBalances) << "\n";
+        //cache->insert(std::pair<unsigned long, float>(std::get<0>(newBalances), std::get<1>(newBalances)));
+        setBalance(std::get<0>(newBalances), std::get<1>(newBalances), true, true);
+        setBalance(std::get<2>(newBalances), std::get<3>(newBalances), true, true);
+
+        //cache->insert(std::pair<unsigned long, float>(std::get<2>(newBalances), std::get<3>(newBalances)));
     }
     // transfer failed, so cache is still valid
     return transferSuccess;

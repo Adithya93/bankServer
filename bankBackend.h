@@ -19,7 +19,8 @@ class bankBackend {
         float getBalance(unsigned long account);
 
         // for creating/resetting accounts and transfers
-        bool setBalance(unsigned long account, float balance, bool reset);
+        //bool setBalance(unsigned long account, float balance, bool reset);
+        bool setBalance(unsigned long account, float balance, bool reset, bool writtenToDB = false);
 
         // for transfers
         //bool saveTransfer(unsigned long fromAccount, unsigned long toAccount, float amount, std::vector<std::string> tags);
