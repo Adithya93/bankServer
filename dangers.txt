@@ -1,0 +1,5 @@
+invalidated cache
+insufficient handling of malformed xml
+test client not scalable enough to assess server's scalability
+Failure to check number of tags against SQL multiple-insert limit of 1000, leading to missing tags for transfers
+Lack of cache eviction policy leading to unbounded memory consumption by server's in-memory cache, leading to server failure

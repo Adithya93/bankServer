@@ -1,0 +1,109 @@
+500 Requests (50 concurrent process of 10 requests each) ThreadPool (4 threads) <Query Result size constant>
+real	0m22.999s
+user	0m1.046s
+sys	0m1.977s
+Peak Queue Length: 46
+
+real	0m22.694s
+user	0m1.039s
+sys	0m1.951s
+Peak Queue Length: 46
+
+real	0m25.427s
+user	0m1.070s
+sys	0m2.062s
+Peak Queue Length: 46
+
+
+500 Requests (50 concurrent process of 10 requests each) ThreadPool (1 threads) <Query Result size constant>
+real	0m47.644s
+user	0m0.911s
+sys	0m1.663s
+Peak Queue Length: 49
+
+
+real	0m45.796s
+user	0m0.885s
+sys	0m1.602s
+Peak Queue Length: 49
+
+real	0m47.705s
+user	0m0.918s
+sys	0m1.667s
+Peak Queue Length: 49
+
+
+500 Requests (50 concurrent process of 10 requests each) ThreadPool (4 threads) + Async
+real	7m37.360s
+user	0m1.040s
+sys	0m1.952s
+
+
+500 Requests (50 concurrent process of 10 requests each) ThreadPool (4 threads)
+real	8m4.555s
+user	0m1.033s
+sys	0m1.920s
+Peak queue length: 46
+
+500 Requests (50 concurrent process of 10 requests each) ThreadPool (1 thread)
+real	18m20.873s
+user	0m0.909s
+sys	0m1.712s
+Peak Queue Length: 49
+
+
+
+10 Requests ThreadPool (4 threads) + Async
+real	0m0.802s
+user	0m0.017s
+sys	0m0.031s
+
+
+10 Requests ThreadPool (4 threads)
+real	0m1.430s
+user	0m0.016s
+sys	0m0.028s
+
+
+
+100 Requests ThreadPool (4 threads) + Async
+(With print statements)
+real	0m40.183s
+user	0m0.138s
+sys	0m0.272s
+
+(Without print statements)
+real	0m42.047s
+user	0m0.144s
+sys	0m0.260s
+
+
+100 Requests ThreadPool (4 threads)
+(With print statements)
+real	0m48.218s
+user	0m0.141s
+sys	0m0.277s
+
+(Without print statements)
+real	0m48.470s
+user	0m0.145s
+sys	0m0.264s
+
+
+
+100 Requests ThreadPool (2 threads)
+(Without print statements)
+real	0m53.444s
+user	0m0.150s
+sys	0m0.278s
+
+
+100 Requests ThreadPool (1 thread) + Async
+real	0m42.489s
+user	0m0.148s
+sys	0m0.272s
+
+100 Requests ThreadPool (1 thread)
+real	0m48.667s
+user	0m0.143s
+sys	0m0.261s

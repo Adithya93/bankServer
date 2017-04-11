@@ -1,0 +1,4 @@
+build index on columns of transactions table
+test client not scalable enough to assess server's scalability
+test client must access random, non-sequential keys of DB
+mix and match different kind of requests (create, xfer, balance, query) in load test to even out resource-contention
