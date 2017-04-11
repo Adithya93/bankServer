@@ -120,6 +120,9 @@ std::string queryNode::getQueryString() { // in-order traversal; should only be 
 			return "FALSE";
 		}
 	}
+	if (rel == 'n') { // NOT query written before operand, unlike AND / OR which are written between operands
+		return val + children->front()->getQueryString();
+	}
 	for (std::vector<queryNode*>::iterator it = children->begin(); it < children->end() - 1; it ++) {
 		nodeQueryString += '(' + (*it)->getQueryString() + ')' + val; 
 	}

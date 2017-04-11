@@ -91,13 +91,11 @@ def makeNotQueryOp(query):
     return "<not>" + query + "</not>" 
 
 # Wrap 2 existing queryStrings with OR
-#def makeOrQueryOp(query1, query2):
 def makeOrQueryOp(queryList):
     opening = "<or>\n\t"
     closing = "\n</or>"
     return opening + "\n\t".join(queryList) + "\n" + closing
 
-#def makeAndQueryOp(query1, query2):
 def makeAndQueryOp(queryList):
     opening = "<and>\n\t"
     closing = "\n</and>"
@@ -110,7 +108,7 @@ def makeLesserQueryOp(attr, gauge):
     return "<less " + attr + "=" + "\"" + str(gauge) + "\"/>"
 
 def makeEqualQueryOp(attr, gauge):
-    return "<equal " + attr + "=" + "\"" + str(gauge) + "\"/>"
+    return "<equals " + attr + "=" + "\"" + str(gauge) + "\"/>"
 
 # Add wrapping-top-level-query tag to query
 def wrapQuery(query, ref):
@@ -181,6 +179,7 @@ def test_create_balance(res, numReqs):
     print("Completed test of CREATE & BALANCE with " + str(failures) + " failures out of " + str(numReqs) + " creates and balances")
     if failures == 0:
         print("UNIT TEST PASSED! :)")
+    return failures == 0
 
 
 def test_create_no_reset_fails(numReqs):
@@ -195,6 +194,7 @@ def test_create_no_reset_fails(numReqs):
     print("Completed test of repeated CREATE with no reset with " + str(failures) + " failures out of " + str(numReqs) + " creates")
     if failures == 0:
         print("UNIT TEST PASSED! :)")
+    return failures == 0
 
 
 def transfer_insufficient_funds(numReqs, forFrom):
@@ -226,6 +226,7 @@ def transfer_insufficient_funds(numReqs, forFrom):
     testFailures = verifyTransferFailures(root, numReqs) # just searches for this many <error> tags
     if testFailures == 0:
         print("UNIT TEST PASSED! :)")
+    return testFailures == 0
 
 def test_transfer_insufficient_funds_from_fails(numReqs):
     return transfer_insufficient_funds(numReqs, True)
@@ -269,6 +270,7 @@ def test_transfer_valid_success(numReqs):
     failures = transfer_valid(numReqs)[0]
     if failures == 0:
         print("UNIT TEST PASSED! :)")
+    return failures == 0
 
 def transfer_valid_balance(numReqs, forFrom):
     failures, exp_balances_from, exp_balances_to = transfer_valid(numReqs)
@@ -283,6 +285,7 @@ def transfer_valid_balance(numReqs, forFrom):
     failures = verifyBalances(chosen_map, response_xml_root)
     if failures == 0:
         print("UNIT TEST PASSED! :)")
+    return failures == 0
 
 def test_transfer_valid_balance_from(numReqs):
     return transfer_valid_balance(numReqs, True)
@@ -303,6 +306,7 @@ def test_query_empty_not():
     success = verifyEmptyResult(root)
     if success:
         print("UNIT TEST PASSED! :)")
+    return success
 
 def test_query_empty_or():
     empty_or_query_str = wrapQuery(makeOrQueryOp(["", ""]), genRef(set([])))
@@ -316,6 +320,7 @@ def test_query_empty_or():
     success = verifyEmptyResult(root)
     if success:
         print("UNIT TEST PASSED! :)")
+    return success
 
 def test_query_relational_greater():
     # choose a random amount, and check result to ensure all transfers fulfill criteria
@@ -331,6 +336,7 @@ def test_query_relational_greater():
     success = verifyGreaterAttr(root, "amount", transferAmount)
     if success:
         print("UNIT TEST PASSED! :)")
+    return success
 
 def test_query_relational_less():
     transferAmount = random.randrange(LARGE_TRANSFER_LOWER_LIMIT, LARGE_TRANSFER_LIMIT)
@@ -345,6 +351,7 @@ def test_query_relational_less():
     success = verifyLesserAttr(root, "amount", transferAmount)
     if success:
         print("UNIT TEST PASSED! :)")
+    return success
 
 def test_query_relational_equal():
     # Make a new transfer with a known FROM account to make sure it exists
@@ -363,17 +370,17 @@ def test_query_relational_equal():
     success = verifyEqualAttr(root, "from", account_from)
     if success:
         print("UNIT TEST PASSED! :)")
-'''
+    return success
+
 def test_query_logical_or(condList):
     queryList = []
-    testList = []
-    for (attr, rel) in condList:
+    for (attr, rel, gauge) in condList:
         if rel == "greater":
-            queryList.append(makeGreaterQueryOp(attr, random.randrange(LARGE_TRANSFER_LIMIT, 2 * LARGE_TRANSFER_LIMIT)))
+            queryList.append(makeGreaterQueryOp(attr, gauge))
         elif rel == "less":
-            queryList.append(makeLesserQueryOp(attr, random.randrange(LARGE_TRANSFER_LOWER_LIMIT)))
+            queryList.append(makeLesserQueryOp(attr, gauge))
         else:
-            queryList.append(makeEqualQueryOp(attr, random.randrange(MAX_BALANCE_VAL)))
+            queryList.append(makeEqualQueryOp(attr, gauge))
     or_query_str = wrapQuery(makeOrQueryOp(queryList), genRef(set([])))
     body = wrapBody(or_query_str, False)
     print("Or Query Request: ")
@@ -385,7 +392,48 @@ def test_query_logical_or(condList):
     success = verifyOr(root, condList)
     if success:
         print("UNIT TEST PASSED! :)")
-'''
+    return success
+
+def test_query_logical_and(condList):
+    queryList = []
+    for (attr, rel, gauge) in condList:
+        if rel == "greater":
+            queryList.append(makeGreaterQueryOp(attr, gauge))
+        elif rel == "less":
+            queryList.append(makeLesserQueryOp(attr, gauge))
+        else:
+            queryList.append(makeEqualQueryOp(attr, gauge))
+    and_query_str = wrapQuery(makeAndQueryOp(queryList), genRef(set([])))
+    body = wrapBody(and_query_str, False)
+    print("Or Query Request: ")
+    print(body)
+    queryResults = sendRequest(body)
+    print("Query Results:")
+    print(queryResults)
+    root = parseResponse(queryResults)
+    success = verifyAnd(root, condList)
+    if success:
+        print("UNIT TEST PASSED! :)")
+    return success
+
+# Come up with more robust/flexible way to test : possible if query class is written (if there is time)
+def test_query_logical_not():
+    transferAmount = random.randrange(LARGE_TRANSFER_LOWER_LIMIT, LARGE_TRANSFER_LIMIT)
+    less_query_str = makeLesserQueryOp("amount", transferAmount)
+    not_query_str = wrapQuery(makeNotQueryOp(less_query_str), genRef(set([])))
+    body = wrapBody(not_query_str, False)
+    print("Query request: ")
+    print(body)
+    queryResults = sendRequest(body)
+    print("Query results: ")
+    print(queryResults)
+    root = parseResponse(queryResults)
+    success = verifyGreaterAttr(root, "amount", transferAmount) or verifyEqualAttr(root, "amount", transferAmount)
+    if success:
+        print("UNIT TEST PASSED! :)")
+    else:
+        print("UNIT TEST FAILED! :(")
+    return success
 
 def parseResponse(response):
     return xml_helper.parse(response)
@@ -393,13 +441,15 @@ def parseResponse(response):
 def genBalanceReqs(accounts):
     opsList = []
     for account in accounts:
-        #opsList.append((accounts[account][0], genRef()))
         opsList.append((accounts[account][0], account))
     balanceReqStr = makeBalanceOps(opsList)
     body = wrapBody(balanceReqStr, True)
     print("Balance Request body: ")
     print(body)
     return body
+
+def verifyAnd(root, condList):
+    return xml_helper.checkAnd(root, condList)
 
 def verifyOr(root, condList):
     return xml_helper.checkOr(root, condList)
@@ -436,12 +486,33 @@ def verifyBalance(exp_value, root, ref):
 def verifyBalances(expected_accounts_map, response_root):
     return [verifyBalance(expected_accounts_map[ref][1], response_root, ref) for ref in expected_accounts_map].count(False)
     
+def run_tests(numReqs):
+    results = []
+    results.append(test_create_balance(reset, numReqs))
+    results.append(test_create_no_reset_fails(numReqs))
+    results.append(test_transfer_insufficient_funds_from_fails(numReqs))
+    results.append(test_transfer_insufficient_funds_to_fails(numReqs))
+    results.append(test_transfer_valid_success(numReqs))
+    results.append(test_transfer_valid_balance_from(numReqs))
+    results.append(test_transfer_valid_balance_to(numReqs))
+    results.append(test_query_empty_not())
+    results.append(test_query_empty_or())
+    results.append(test_query_relational_greater())
+    results.append(test_query_relational_less())
+    results.append(test_query_relational_equal())
+    results.append(test_query_logical_or([("amount", "greater", 631000), ("amount", "less", 800000), ("to", "less", 166000)]))
+    results.append(test_query_logical_and([("amount", "greater", 400000), ("amount", "less", 800000), ("to", "less", 999999)]))
+    results.append(test_query_logical_not())
+    successes = results.count(True)
+    failures = results.count(False)
+    print("COMPLETED " + str(len(results)) + " TESTS WITH " + str(successes) + " SUCCESSES and " + str(failures) + " FAILURES.")
+
 
 def sendRequest(body):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((HOST, PORT))
         s.sendall(addHeader(body))
-        data = s.recv(8192)
+        data = s.recv(16384)
     response = repr(data)
     print('Received', response)
     return bytes.decode(data)
@@ -457,26 +528,5 @@ if __name__ == "__main__":
         numReqs = int(sys.argv[2])
         if len(sys.argv) > 3:
             reset = True if sys.argv[3].lower() == 't' else False
-#test_create_balance(reset, numReqs)
-#test_create_no_reset_fails(numReqs)
-#test_transfer_insufficient_funds_from_fails(numReqs)
-#test_transfer_insufficient_funds_to_fails(numReqs)
-#test_transfer_valid_success(numReqs)
-#test_transfer_valid_balance_from(numReqs)
-#test_transfer_valid_balance_to(numReqs)
-#test_query_empty_not()
-#test_query_empty_or()
-#test_query_relational_greater()
-#test_query_relational_less()
-#test_query_relational_equal()
-#test_query_logical_or([("amount", "greater"), ("to", "less")])
-#test_query_logical_and()
-#test_query_logical_not()
-
-
-
-
-
-
-
+    run_tests(numReqs)
 

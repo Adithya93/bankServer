@@ -75,6 +75,68 @@ def checkEquals(root, attr, gauge):
 		print("Passed on " + tested_attr.text)
 	return True
 
+# does not handle nested logicals yet
+def checkOr(root, condList):
+	transfers = root.findall("./results/transfer")
+	for transfer in transfers:
+		passed = False
+		for (attr, rel, gauge) in condList:
+			print("Searching for " + rel + ", " + attr + str(gauge))
+			tested_attr = transfer.find(attr)
+			if tested_attr == None: #missing attribute - error
+				print("Transfer element is missing attribute " + attr)
+				return False
+			if rel == "greater" :
+				if float(tested_attr.text) > gauge:  # the or is fulfilled for this transfer already
+					print("transfer " + attr + " : " + tested_attr.text + " passed on " + rel + " : " + str(gauge))
+					passed = True
+					break
+				#else:
+				#	print("transfer " + attr + " : " + tested_attr.text + " does not fulfill " + rel + " : " + str(gauge))
+			elif rel == "less" :
+				if float(tested_attr.text) < gauge:
+					print("transfer " + attr + " : " + tested_attr.text + " passed on " + rel + ": " + str(gauge))
+					passed = True
+					break
+			elif rel == "equals" :
+				if float(tested_attr.text) == gauge:
+					print("transfer " + attr + " : " + tested_attr.text + " passed on " + rel + ": " + str(gauge))
+					passed = True
+					break
+			print("transfer " + attr + " : " + tested_attr.text + " does not fulfill " + rel + " : " + str(gauge))
+		if not passed:
+			print("Transfer failed to fulfill any OR condition!")
+			return False
+		print("Transfer passed")
+	return True
+
+# does not handle nested logicals yet
+def checkAnd(root, condList):
+	transfers = root.findall("./results/transfer")
+	for transfer in transfers:
+		passed = True
+		for (attr, rel, gauge) in condList:
+			print("Searching for " + rel + ", " + attr + str(gauge))
+			tested_attr = transfer.find(attr)
+			if tested_attr == None: #missing attribute - error
+				print("Transfer element is missing attribute " + attr)
+				return False
+			if rel == "greater" :
+				if float(tested_attr.text) <= gauge:  # the or is fulfilled for this transfer already
+					print("transfer " + attr + " : " + tested_attr.text + " eliminated by " + rel + " : " + str(gauge))
+					return False
+			elif rel == "less" :
+				if float(tested_attr.text) >= gauge:
+					print("transfer " + attr + " : " + tested_attr.text + " eliminated by " + rel + ": " + str(gauge))
+					return False
+			elif rel == "equals" :
+				if float(tested_attr.text) != gauge:
+					print("transfer " + attr + " : " + tested_attr.text + " eliminated by " + rel + ": " + str(gauge))
+					return False
+			print("transfer " + attr + " : " + tested_attr.text + " fulfills " + rel + " : " + str(gauge))
+		print("Transfer passed")
+	return True
+
 '''
 tree = ET.parse('errorTest')
 root = tree.getroot()

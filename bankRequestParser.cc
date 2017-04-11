@@ -380,6 +380,7 @@ using namespace xercesc;
         rel = 'o';
       }
       else if (strcmp(nodeName, "not") == 0) {
+        std::cout << "Now parsing a NOT node\n";
         rel = 'n';
       }
       else { // relational operator - Base-Case : No child nodes
@@ -423,7 +424,7 @@ using namespace xercesc;
           return NULL;
         }
         q = new queryNode(rel, val, attr);
-        //std::cout << "Adding simple node with query " << q->getQueryString() << "\n";
+        std::cout << "Adding simple node with query " << q->getQueryString() << "\n";
         return q;
     }
       // logical operator: add children, and if any child invalid, invalidate entire query tree
