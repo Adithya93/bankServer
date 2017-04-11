@@ -6,8 +6,10 @@
 #include <cmath>
 #include <fstream>
 #include <sstream>
+#include <future>
 
 #define MAX_UINT 18446744073709551615
+#define PORT 
 
 // generates a random integer between 0 and n inclusive
 int RNG(int n){
@@ -137,6 +139,7 @@ void balanceRequest(std::vector<uint64_t> &accounts, std::ofstream &toFile, int 
 }
 
 void queryRequest(std::vector<uint64_t> &accounts, std::ofstream &toFile, int i){
+  int amount = RNG(1000);
   // for "or" and "equals"
   uint64_t accountNumber1 = accounts[RNG(accounts.size())];
   uint64_t accountNumber2 = accounts[RNG(accounts.size())];
@@ -147,6 +150,7 @@ void queryRequest(std::vector<uint64_t> &accounts, std::ofstream &toFile, int i)
   toFile << "\t\t\t" << "<equals from=\"" << accountNumber1 << "\"/>" << std::endl;
   toFile << "\t\t\t" << "<equals to=\"" << accountNumber2 << "\"/>" << std::endl;
   toFile << "\t\t" << "</or>" << std::endl;
+  toFile << "\t\t" << "<equal amount=\"" << amount << "\"/>" << std::endl;
   toFile << "\t" << "</query>" << std::endl;
   
 
@@ -160,6 +164,7 @@ void queryRequest(std::vector<uint64_t> &accounts, std::ofstream &toFile, int i)
   toFile << "\t\t\t" << "<less from=\"" << accountNumber3 << "\"/>" << std::endl;
   toFile << "\t\t\t" << "<less to=\"" << accountNumber4 << "\"/>" << std::endl;
   toFile << "\t\t" << "</and>" << std::endl;
+  toFile << "\t\t" << "<less amount=\"" << amount << "\"/>" << std::endl;
   toFile << "\t" << "</query>" << std::endl;
   
   // for "not" and "greater"
@@ -172,12 +177,13 @@ void queryRequest(std::vector<uint64_t> &accounts, std::ofstream &toFile, int i)
   toFile << "\t\t\t" << "<greater from=\"" << accountNumber5 << "\"/>" << std::endl;
   toFile << "\t\t\t" << "<greater to=\"" << accountNumber6 << "\"/>" << std::endl;
   toFile << "\t\t" << "</not>" << std::endl;
+  toFile << "\t\t" << "<greater amount=\"" << amount << "\"/>" << std::endl;
   toFile << "\t" << "</query>" << std::endl;
   
   //generate some random test cases
   int chooseLogic = RNG(2);
   int chooseRelation = RNG(2);
-
+  int amount2 = RNG(2000);
   //std::cout << "chooseLogic: " << chooseLogic << " chooseRelation: " << chooseRelation << std::endl;
   
   uint64_t accountNumber7 = accounts[RNG(accounts.size())];
@@ -194,6 +200,7 @@ void queryRequest(std::vector<uint64_t> &accounts, std::ofstream &toFile, int i)
       toFile << "\t\t\t" << "<equal from=\"" << accountNumber7 << "\"/>" << std::endl;
       toFile << "\t\t\t" << "<equal to=\"" << accountNumber8 << "\"/>" << std::endl;
       toFile << "\t\t" << "</or>" << std::endl;
+      toFile << "\t\t" << "<equal amount=\"" << amount2 << "\"/>" << std::endl;
       toFile << "\t" << "</query>" << std::endl;
     }
     // "less"
@@ -203,6 +210,7 @@ void queryRequest(std::vector<uint64_t> &accounts, std::ofstream &toFile, int i)
       toFile << "\t\t\t" << "<less from=\"" << accountNumber7 << "\"/>" << std::endl;
       toFile << "\t\t\t" << "<less to=\"" << accountNumber8 << "\"/>" << std::endl;
       toFile << "\t\t" << "</or>" << std::endl;
+      toFile << "\t\t" << "<less amount=\"" << amount2 << "\"/>" << std::endl;
       toFile << "\t" << "</query>" << std::endl;
     }
     // "greater"
@@ -212,6 +220,7 @@ void queryRequest(std::vector<uint64_t> &accounts, std::ofstream &toFile, int i)
       toFile << "\t\t\t" << "<greater from=\"" << accountNumber7 << "\"/>" << std::endl;
       toFile << "\t\t\t" << "<greater to=\"" << accountNumber8 << "\"/>" << std::endl;
       toFile << "\t\t" << "</or>" << std::endl;
+      toFile << "\t\t" << "<greater amount=\"" << amount2 << "\"/>" << std::endl;
       toFile << "\t" << "</query>" << std::endl;
     }
   }
@@ -224,6 +233,7 @@ void queryRequest(std::vector<uint64_t> &accounts, std::ofstream &toFile, int i)
       toFile << "\t\t\t" << "<equal from=\"" << accountNumber7 << "\"/>" << std::endl;
       toFile << "\t\t\t" << "<equal to=\"" << accountNumber8 << "\"/>" << std::endl;
       toFile << "\t\t" << "</and>" << std::endl;
+      toFile << "\t\t" << "<equal amount=\"" << amount2 << "\"/>" << std::endl;
       toFile << "\t" << "</query>" << std::endl;
     }
     // "less"
@@ -233,6 +243,7 @@ void queryRequest(std::vector<uint64_t> &accounts, std::ofstream &toFile, int i)
       toFile << "\t\t\t" << "<less from=\"" << accountNumber7 << "\"/>" << std::endl;
       toFile << "\t\t\t" << "<less to=\"" << accountNumber8 << "\"/>" << std::endl;
       toFile << "\t\t" << "</and>" << std::endl;
+      toFile << "\t\t" << "<less amount=\"" << amount2 << "\"/>" << std::endl;
       toFile << "\t" << "</query>" << std::endl;
     }
     // "greater"
@@ -242,6 +253,7 @@ void queryRequest(std::vector<uint64_t> &accounts, std::ofstream &toFile, int i)
       toFile << "\t\t\t" << "<greater from=\"" << accountNumber7 << "\"/>" << std::endl;
       toFile << "\t\t\t" << "<greater to=\"" << accountNumber8 << "\"/>" << std::endl;
       toFile << "\t\t" << "</and>" << std::endl;
+      toFile << "\t\t" << "<greater amount=\"" << amount2 << "\"/>" << std::endl;
       toFile << "\t" << "</query>" << std::endl;
     }
   }
@@ -254,6 +266,7 @@ void queryRequest(std::vector<uint64_t> &accounts, std::ofstream &toFile, int i)
       toFile << "\t\t\t" << "<equal from=\"" << accountNumber7 << "\"/>" << std::endl;
       toFile << "\t\t\t" << "<equal to=\"" << accountNumber8 << "\"/>" << std::endl;
       toFile << "\t\t" << "</not>" << std::endl;
+      toFile << "\t\t" << "<equal amount=\"" << amount2 << "\"/>" << std::endl;
       toFile << "\t" << "</query>" << std::endl;
     }
     // "less"
@@ -263,6 +276,7 @@ void queryRequest(std::vector<uint64_t> &accounts, std::ofstream &toFile, int i)
       toFile << "\t\t\t" << "<less from=\"" << accountNumber7 << "\"/>" << std::endl;
       toFile << "\t\t\t" << "<less to=\"" << accountNumber8 << "\"/>" << std::endl;
       toFile << "\t\t" << "</not>" << std::endl;
+      toFile << "\t\t" << "<less amount=\"" << amount2 << "\"/>" << std::endl;
       toFile << "\t" << "</query>" << std::endl;
     }
     // "greater"
@@ -272,6 +286,7 @@ void queryRequest(std::vector<uint64_t> &accounts, std::ofstream &toFile, int i)
       toFile << "\t\t\t" << "<greater from=\"" << accountNumber7 << "\"/>" << std::endl;
       toFile << "\t\t\t" << "<greater to=\"" << accountNumber8 << "\"/>" << std::endl;
       toFile << "\t\t" << "</not>" << std::endl;
+      toFile << "\t\t" << "<greater amount=\"" << amount2 << "\"/>" << std::endl;
       toFile << "\t" << "</query>" << std::endl;
     }
   }
@@ -281,14 +296,14 @@ void queryRequest(std::vector<uint64_t> &accounts, std::ofstream &toFile, int i)
 int main(){
   int createCounter = 1;
   int counter = 1;
-  for(int i = 1; i < 3; i ++){
+  // change i < n where (n-1) is the number of XML files created
+  for(int i = 1; i < 5; i ++){
     std::vector<uint64_t> accounts;
     std::stringstream fileName;
     std::ofstream toFile;
     fileName << "Ltest" << i << ".xml";
     toFile.open(fileName.str());
     toFile << "<?xml version=""1.0"" encoding=""UTF-8""?>" << std::endl;
-    // kind of functional testing
     reset(toFile);
     for(int j = 10000*(i-1)+1; j < 10000*i+1; j++){
       createRequest(accounts,toFile,j);
@@ -309,5 +324,9 @@ int main(){
     toFile << "</transactions>" << std::endl;
     toFile.close();
   }
+
+  // all XML files created at this point
+  // XML files are named as "Ltestx.xml" where x ranges from 1 to (n-1) where n is max i from above for loop
+  
   return 0;
 }
