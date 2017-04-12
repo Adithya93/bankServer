@@ -4,6 +4,7 @@ import socket
 import sys
 import random
 import time
+import struct
 import func_test_xml_helper as xml_helper
 
 
@@ -519,6 +520,7 @@ def run_tests(host, numReqs=10, load_test=False):
         and_tup = FUNC_TEST_AND_TUP
 
     HOST = host
+    print("Host is now",HOST)
     results = []
     results.append(test_create_balance(True, numReqs)) # balance latency for numReqs
     results.append(test_create_no_reset_fails(numReqs)) # create latency for numReqs
@@ -552,15 +554,32 @@ def run_tests(host, numReqs=10, load_test=False):
 def sendRequest(body):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((HOST, PORT))
+        #s.connect((socket.gethostbyaddr(HOST), PORT))
         s.sendall(addHeader(body))
         # start timing
         start_time = time.time()
-        data = s.recv(131072)
-        end_time = time.time()
+        body_len_bytes = s.recv(8)
+        end_time = time.time() # Eventually decided to cap the timing here to exclude the time for receiving long responses on client socket
+        print("Byte header received: ", body_len_bytes)
+        body_len = struct.unpack('>Q', body_len_bytes)[0]
+        print("Body length mentioned in header: ", body_len)
+        recvd = 0
+        data = b''
+        time_taken = end_time - start_time
+        recvd_data = None
+        while recvd < body_len:
+            #start_time = time.time()
+            recvd_data = s.recv(body_len - recvd)
+            #end_time = time.time()
+            #time_taken += end_time - start_time
+            recvd += len(recvd_data)
+            data += recvd_data
+        #end_time = time.time()
         # stop timing
-    response = repr(data)
-    print('Received', response)
-    return (bytes.decode(data), end_time - start_time)
+        response = repr(data)
+        print("Length of receieved data: ", str(len(response)))
+        print('Received', response)
+        return (bytes.decode(data), time_taken)
 
 if __name__ == "__main__":
     numReqs = 10
