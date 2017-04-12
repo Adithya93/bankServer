@@ -6,13 +6,15 @@
 #include <xercesc/framework/MemBufInputSource.hpp>
 #include <iostream>
 #include <vector>
+#include "./portable_endian.h"
 
 class bankResponseWriter {
 
 	public:
 		bankResponseWriter();
 
-		std::string getParseErrorResponse();
+		//std::string getParseErrorResponse();
+		char* getParseErrorResponse(int* errorResponseLen);
 
 		std::string createSuccessResponse(std::string ref);
 
@@ -32,9 +34,13 @@ class bankResponseWriter {
 
 		std::string queryErrorResponse(std::string ref); 
 		//std::string constructResponse(std::vector<std::tuple<bool, std::string>>* createResults, std::vector<std::tuple<float, std::string>>* balanceResults, std::vector<std::tuple<bool, std::string>>* transferResults, std::vector<std::tuple<std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>>* queryResults);
-		std::string constructResponse(std::vector<std::tuple<bool, std::string>>* createResults, std::vector<std::tuple<float, std::string>>* balanceResults, std::vector<std::tuple<int, std::string>>* transferResults, std::vector<std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>>* queryResults);
-		std::string hostToNetLong64(unsigned long hostLong);
-		std::string addHeaderString(std::string responseBody);
+		//std::string constructResponse(std::vector<std::tuple<bool, std::string>>* createResults, std::vector<std::tuple<float, std::string>>* balanceResults, std::vector<std::tuple<int, std::string>>* transferResults, std::vector<std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>>* queryResults);
+		char* constructResponse(std::vector<std::tuple<bool, std::string>>* createResults, std::vector<std::tuple<float, std::string>>* balanceResults, std::vector<std::tuple<int, std::string>>* transferResults, std::vector<std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>>* queryResults, int* responseLen);
+
+		//std::string hostToNetLong64(unsigned long hostLong);
+		//std::string addHeaderString(std::string responseBody);
+		char* hostToNetLong64(unsigned long hostLong, char* responseBuff);
+		char* addHeaderString(std::string responseBody);
 
 	private:
 		std::string unparseableError;

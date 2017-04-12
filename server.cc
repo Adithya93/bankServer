@@ -24,9 +24,10 @@ const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 11\r\n\r\nbooyakasha\
 const char* BAD_RESPONSE = "HTTP/1.1 400 BAD REQUEST\r\nContent-Length: 0\r\n\r\n\0";
 int BAD_RESPONSE_LEN = (int)strlen(BAD_RESPONSE); 
 
-int POOL_SIZE = 1;
+int POOL_SIZE = 4;
 bankBackend* backend;
 int PORT = 3000;
+int BACKLOG = 128;
 int listenFd;
 threadPool* pool;
 
@@ -57,8 +58,6 @@ int bindAndListen(int port, int backlog) {
 
 // ntohl is for 32 bits, but unsigned long is 64 bits, so this helper is used here instead for network long to host long
 unsigned long netToHostLong64(char * ptr) {
-	//printf("Header buff: %s\n", ptr);
-	//printByteByByte(ptr);
 	unsigned long * docSizePtr = (unsigned long *)ptr;
 	unsigned long docSize = *docSizePtr;
 	unsigned int docSizeMost4 = ntohl((uint32_t)*docSizePtr);
@@ -119,12 +118,13 @@ char* readRequest(int connfd) {
 	return NULL;
 }
 
-void respond(int connfd, const char* responseStr, int responseStrLen) {
+//void respond(int connfd, const char* responseStr, int responseStrLen) {
+void respond(int connfd, char* responseStr, int responseStrLen) {
 	if (write(connfd, responseStr, responseStrLen) < responseStrLen) {
 		std::cout << "Did not finish writing response\n";
 	}
 	else {
-		//std::cout << "Successfully returned response\n";
+		std::cout << "Successfully returned response of length " << responseStrLen << "\n";
 	}
 }
 
@@ -132,7 +132,9 @@ void respond(int connfd, const char* responseStr, int responseStrLen) {
 void serviceRequest(int connfd) {
 	bankRequestParser parser;
 	bankResponseWriter writer;
-	std::string errorResponse = writer.getParseErrorResponse(); // should find a way to avoid repetition
+	//std::string errorResponse = writer.getParseErrorResponse(); // should find a way to avoid repetition
+	int errorResponseLen;
+	char* errorResponse = writer.getParseErrorResponse(&errorResponseLen); // should find a way to avoid repetition
 	char * reqBuffer;
 	if ((reqBuffer = readRequest(connfd))) {
 		// hand over to parser -> eventually either a separate thread, or a threadpool, etc
@@ -140,7 +142,8 @@ void serviceRequest(int connfd) {
 	    if (parser.parseRequest()) { // parser returned error while reading document
 	    	std::cout << "Unable to parse request, must be badly formed.\n";
 	    	// should return error xml
-			respond(connfd, errorResponse.c_str(), (int)errorResponse.size());			    	
+			//respond(connfd, errorResponse.c_str(), (int)errorResponse.size());			    	
+	    	respond(connfd, errorResponse, errorResponseLen);
 	    }
 	    else { // creates, balances, transfers and queries for this request are all available now
 	    	/*
@@ -165,19 +168,20 @@ void serviceRequest(int connfd) {
 		    //std::cout << "Time elapsed on database/cache: " << t << " clicks; " << (((float)t)/CLOCKS_PER_SEC) << " secs\n";
 
 
-		    std::string successResponse = writer.constructResponse(&createResults, &balanceResults, &transferResults, &queryResults);
-		    respond(connfd, successResponse.c_str(), (int)successResponse.size());
+		    //std::string successResponse = writer.constructResponse(&createResults, &balanceResults, &transferResults, &queryResults);
+		    int responseLen;
+		    char* successResponse = writer.constructResponse(&createResults, &balanceResults, &transferResults, &queryResults, &responseLen);
+		    //respond(connfd, successResponse.c_str(), (int)successResponse.size());
+			respond(connfd, successResponse, responseLen);
 		}
 	    //delete test;
 	    parser.cleanUp(); // done with request, clean up all XMLParsing resources
 		free(reqBuffer);
 	}
 	else { // bad request
-		//respondToMissingHeader(connfd);
-		respond(connfd, errorResponse.c_str(), (int)errorResponse.size());
+		respond(connfd, errorResponse, errorResponseLen);
 	}
 	close(connfd);
-	//free(reqBuffer);
 }
 
 void cleanUp() {
@@ -200,7 +204,7 @@ void handleSignal(int num) {
 
 
 int main() {
-	listenFd = bindAndListen(PORT, 10);
+	listenFd = bindAndListen(PORT, BACKLOG);
 	int connfd;
 	struct sockaddr_in cliaddr;
 	socklen_t len;
@@ -228,14 +232,5 @@ int main() {
 			pool->enqueueRequest(connfd); // Will be picked up by threads of pool
 		}
 	}
-	/*
-	backend->cleanUp();
-	delete backend;
-	int totalServiced = pool->shutdown();
-	std::cout << "Total requests serviced : " << totalServiced;
-	delete pool;
-	close(listenFd);
-	XMLPlatformUtils::Terminate();
-	*/
 	exit(1);
 }

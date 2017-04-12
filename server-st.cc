@@ -24,6 +24,7 @@ int BAD_RESPONSE_LEN = (int)strlen(BAD_RESPONSE);
 
 bankBackend* backend;
 int PORT = 3000;
+int BACKLOG = 128;
 int listenFd;
 
 int bindAndListen(int port, int backlog) {
@@ -107,53 +108,13 @@ char* readRequest(int connfd) {
 	return NULL;
 }
 
-void respond(int connfd, const char* responseStr, int responseStrLen) {
+//void respond(int connfd, const char* responseStr, int responseStrLen) {
+void respond(int connfd, char* responseStr, int responseStrLen) {
 	if (write(connfd, responseStr, responseStrLen) < responseStrLen) {
 		std::cout << "Did not finish writing response\n";
 	}
 	else {
 	}
-}
-
-void serviceRequest(int connfd) {
-	bankRequestParser parser;
-	bankResponseWriter writer;
-	std::string errorResponse = writer.getParseErrorResponse(); // should find a way to avoid repetition
-	char * reqBuffer;
-	if ((reqBuffer = readRequest(connfd))) {
-		// hand over to parser -> eventually either a separate thread, or a threadpool, etc
-		parser.initialize(reqBuffer, (unsigned long)strlen(reqBuffer));
-	    if (parser.parseRequest()) { // parser returned error while reading document
-	    	std::cout << "Unable to parse request, must be badly formed.\n";
-	    	// should return error xml
-			respond(connfd, errorResponse.c_str(), (int)errorResponse.size());			    	
-	    }
-	    else { // creates, balances, transfers and queries for this request are all available now
-		    clock_t start, end, t;
-		    std::vector<std::tuple<unsigned long, float, bool, std::string>> createReqs = parser.getCreateReqs();
-		    std::vector<std::tuple<unsigned long, std::string>> balanceReqs = parser.getBalanceReqs();
-		    std::vector<std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>> transferReqs = parser.getTransferReqs();
-		    std::vector<std::tuple<std::string, std::string>> queryReqs = parser.getQueryReqs();
-
-			start = clock();
-		    std::vector<std::tuple<bool, std::string>> createResults = backend->createAccounts(createReqs);
-			std::vector<std::tuple<float, std::string>> balanceResults = backend->getBalances(balanceReqs);
-			std::vector<std::tuple<int, std::string>> transferResults = backend->doTransfers(transferReqs);
-			std::vector<std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>> queryResults = backend->doQueries(queryReqs);
-			end = clock();
-			t = end - start;
-		    std::string successResponse = writer.constructResponse(&createResults, &balanceResults, &transferResults, &queryResults);
-		    respond(connfd, successResponse.c_str(), (int)successResponse.size());
-		}
-	    //delete test;
-	    parser.cleanUp(); // done with request, clean up all XMLParsing resources
-		free(reqBuffer);
-	}
-	else { // bad request
-		//respondToMissingHeader(connfd);
-		respond(connfd, errorResponse.c_str(), (int)errorResponse.size());
-	}
-	close(connfd);
 }
 
 
@@ -175,7 +136,7 @@ void handleSignal(int num) {
 
 int main() {
 	std::cout << "Booyakasha C++!\n";
-	listenFd = bindAndListen(PORT, 10);
+	listenFd = bindAndListen(PORT, BACKLOG);
 	int connfd;
 	struct sockaddr_in cliaddr;
 	socklen_t len;
@@ -201,7 +162,9 @@ int main() {
 		else {
 			bankRequestParser parser;
 			bankResponseWriter writer;
-			std::string errorResponse = writer.getParseErrorResponse(); // should find a way to avoid repetition
+			//std::string errorResponse = writer.getParseErrorResponse(); // should find a way to avoid repetition
+			int errorResponseLen;
+			char* errorResponse = writer.getParseErrorResponse(&errorResponseLen); 
 			char * reqBuffer;
 			if ((reqBuffer = readRequest(connfd))) {
 		// hand over to parser -> eventually either a separate thread, or a threadpool, etc
@@ -210,7 +173,8 @@ int main() {
 			    if (parser.parseRequest()) { // parser returned error while reading document
 			    	std::cout << "Unable to parse request, must be badly formed.\n";
 			    	// should return error xml
-					respond(connfd, errorResponse.c_str(), (int)errorResponse.size());			    	
+					//respond(connfd, errorResponse.c_str(), (int)errorResponse.size());			    	
+			    	respond(connfd, errorResponse, errorResponseLen);
 			    }
 	    		else { // creates, balances, transfers and queries for this request are all available now
 				    clock_t start, end, t;
@@ -226,14 +190,18 @@ int main() {
 					std::vector<std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>> queryResults = backend->doQueries(queryReqs);
 					end = clock();
 					t = end - start;
-				    std::string successResponse = writer.constructResponse(&createResults, &balanceResults, &transferResults, &queryResults);
-				    respond(connfd, successResponse.c_str(), (int)successResponse.size());
+				    //std::string successResponse = writer.constructResponse(&createResults, &balanceResults, &transferResults, &queryResults);
+				    //respond(connfd, successResponse.c_str(), (int)successResponse.size());
+					int responseLen;
+					char* successResponse = writer.constructResponse(&createResults, &balanceResults, &transferResults, &queryResults, &responseLen);
+					respond(connfd, successResponse, responseLen);
 				}
 		    	parser.cleanUp(); // done with request, clean up all XMLParsing resources
 				free(reqBuffer);
 			}
 			else { // bad request
-				respond(connfd, errorResponse.c_str(), (int)errorResponse.size());
+				//respond(connfd, errorResponse.c_str(), (int)errorResponse.size());
+				respond(connfd, errorResponse, errorResponseLen);
 			}
 		close(connfd);
 		}

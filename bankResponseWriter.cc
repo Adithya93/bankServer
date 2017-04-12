@@ -5,7 +5,9 @@
 		unparseableError = std::string("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<error>Unparseable document. Please ensure proper formatting and correct length specification in header.</error>\n");
 	}
 
-	std::string bankResponseWriter::getParseErrorResponse() {
+	//std::string bankResponseWriter::getParseErrorResponse() {
+    char* bankResponseWriter::getParseErrorResponse(int* errorResponseLen) {
+    	*errorResponseLen = unparseableError.size() + 8;
     	return addHeaderString(unparseableError);
 	}
 
@@ -68,7 +70,8 @@
 
 	// Only for successfully parsed requests
 	//std::string bankResponseWriter::constructResponse(std::vector<std::tuple<bool, std::string>>* createResults, std::vector<std::tuple<float, std::string>>* balanceResults, std::vector<std::tuple<bool, std::string>>* transferResults, std::vector<std::tuple<std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>>* queryResults) {
-	std::string bankResponseWriter::constructResponse(std::vector<std::tuple<bool, std::string>>* createResults, std::vector<std::tuple<float, std::string>>* balanceResults, std::vector<std::tuple<int, std::string>>* transferResults, std::vector<std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>>* queryResults) {
+	//std::string bankResponseWriter::constructResponse(std::vector<std::tuple<bool, std::string>>* createResults, std::vector<std::tuple<float, std::string>>* balanceResults, std::vector<std::tuple<int, std::string>>* transferResults, std::vector<std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>>* queryResults) {
+	char* bankResponseWriter::constructResponse(std::vector<std::tuple<bool, std::string>>* createResults, std::vector<std::tuple<float, std::string>>* balanceResults, std::vector<std::tuple<int, std::string>>* transferResults, std::vector<std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>>* queryResults, int * responseLen) {
 		std::string opening("<?xml version=\"1.0\" encoding=\"UTF-8\" ?><results>");
 		std::string body;
 
@@ -119,31 +122,46 @@
 		std::string closing("</results>");
 		opening.append(body);
 		opening.append(closing);
+		*responseLen = opening.size() + 8;
 		return addHeaderString(opening);
 	}
 
-	std::string bankResponseWriter::hostToNetLong64(unsigned long hostLong) {
-		unsigned int most4 = htonl((uint32_t)hostLong);
-		unsigned int least4 = htonl((uint32_t)*(((int*)&hostLong) + 1));
-		unsigned long netLongMost4 = ((unsigned long)most4) << (8 * (int)(sizeof(int)));
-		unsigned long netLongLeast4 = ((unsigned long)least4);
-		unsigned long netLong = netLongMost4 | netLongLeast4;
+	/*
+	void printByteByByte(char * ptr) {
+		char * endPtr = ptr + 8;
+		char * readPtr = ptr;
+		while (readPtr < endPtr) {
+			printf("Char: %c\n", *readPtr);
+			//printf("Byte: %2X\n", *readPtr++);
+			printf("ASCII value: %u\n", (unsigned int)(*readPtr++));
+		}
+	}
+	*/
+
+	//std::string bankResponseWriter::hostToNetLong64(unsigned long hostLong) {
+	char * bankResponseWriter::hostToNetLong64(unsigned long hostLong, char* responseBuff) {
+		//std::cout << "Printing original byte:\n";
+		//printByteByByte((char*)&hostLong);
+		unsigned long netLong = htobe64((uint64_t)hostLong);
 		//std::cout << "Net long: " << netLong << "\n";
-		char* byteChars = (char*)malloc(sizeof(unsigned long) + 1);
-		memset(byteChars, 0, sizeof(unsigned long) + 1);
-		strcpy(byteChars, (char*)&netLong);
-		std::string byteString(byteChars);
-		free(byteChars);
-		return byteString;
+		char* byteString = responseBuff;
+		for (int i = 0; i < 8; i ++) {
+			byteString[i] = *(((char*)(&netLong)) + i);
+		}
+		//std::cout << "Endian string: " << byteString << "\n";
+		//printByteByByte(byteString);
+		return byteString + 8;
 	}
 
 
-	std::string bankResponseWriter::addHeaderString(std::string responseBody) {
+	//std::string bankResponseWriter::addHeaderString(std::string responseBody) {
+	char* bankResponseWriter::addHeaderString(std::string responseBody) {
 		unsigned long responseLen = (unsigned long)responseBody.size();
-		//std::cout << "Length of response body: " << responseLen << "\n";
-		std::string responseLenStr = hostToNetLong64(responseLen);
-    	//std::cout<< "Response length string: " << responseLenStr << "\n";
-    	responseLenStr.append(responseBody);
-    	return responseLenStr;
+		char* responseBuff = (char*)malloc((responseLen + 9) * sizeof(char));
+		memset(responseBuff, 0, (responseLen + 9));
+    	char* responseBodyPtr = hostToNetLong64(responseLen, responseBuff);
+		strcpy(responseBodyPtr, responseBody.c_str());
+		return responseBuff;
 	}
+
 			 
