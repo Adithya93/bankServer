@@ -140,7 +140,7 @@
 
 	std::string bankResponseWriter::addHeaderString(std::string responseBody) {
 		unsigned long responseLen = (unsigned long)responseBody.size();
-		std::cout << "Length of response body: " << responseLen << "\n";
+		//std::cout << "Length of response body: " << responseLen << "\n";
 		std::string responseLenStr = hostToNetLong64(responseLen);
     	//std::cout<< "Response length string: " << responseLenStr << "\n";
     	responseLenStr.append(responseBody);

@@ -14,9 +14,7 @@
 #include "./bankRequestParser.h"
 #include "./bankBackend.h"
 #include "./bankResponseWriter.h"
-#include "./threadPool.h"
 
-//using namespace std;
 using namespace xercesc;
 
 int HEADER_SIZE = 8;
@@ -24,11 +22,9 @@ const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 11\r\n\r\nbooyakasha\
 const char* BAD_RESPONSE = "HTTP/1.1 400 BAD REQUEST\r\nContent-Length: 0\r\n\r\n\0";
 int BAD_RESPONSE_LEN = (int)strlen(BAD_RESPONSE); 
 
-int POOL_SIZE = 1;
 bankBackend* backend;
 int PORT = 3000;
 int listenFd;
-threadPool* pool;
 
 int bindAndListen(int port, int backlog) {
 	// initialize socket
@@ -48,7 +44,7 @@ int bindAndListen(int port, int backlog) {
 		perror("Unable to bind");
 		exit(1);
   	}
-	//std::cout << "Bind successful, dropping root privilegees\n";
+	std::cout << "Bind successful, dropping root privilegees\n";
 	// Should drop privileges since bind to privileged port is done
 	listen(listenFd, backlog);
 	std::cout << "Listening on socket " << listenFd << "\n";
@@ -57,17 +53,12 @@ int bindAndListen(int port, int backlog) {
 
 // ntohl is for 32 bits, but unsigned long is 64 bits, so this helper is used here instead for network long to host long
 unsigned long netToHostLong64(char * ptr) {
-	//printf("Header buff: %s\n", ptr);
-	//printByteByByte(ptr);
 	unsigned long * docSizePtr = (unsigned long *)ptr;
 	unsigned long docSize = *docSizePtr;
 	unsigned int docSizeMost4 = ntohl((uint32_t)*docSizePtr);
-//	std::cout << "MSB 4 bytes of document are " << docSizeMost4 << "\n";
 	unsigned int docSizeLeast4 = ntohl((uint32_t)*((int*)docSizePtr + 1));
-//	std::cout << "LSB 4 bytees of document are " << docSizeLeast4 << "\n";
 	docSize = (((unsigned long)(docSizeMost4)) << (8 * (int)(sizeof(int))));
 	docSize = docSize | ((unsigned long)docSizeLeast4);
-	//std::cout << "Doc size is  " << docSize << "\n";
 	return docSize;
 }
 
@@ -77,7 +68,6 @@ unsigned long readHeader(int connfd) {
 	memset(headerBuff, 0, HEADER_SIZE + 1);
 	if (read(connfd, headerBuff, HEADER_SIZE) < HEADER_SIZE) {
 		std::cout << "Invalid header, ignoring request\n";
-		//close(connfd);
 		return 0;
 	}
 	return netToHostLong64(headerBuff);
@@ -100,13 +90,11 @@ char* readBody(int connfd, unsigned long bodySize) {
 		}
 		if (readNow == 0) { // socket closed?
 			std::cout << "Socket closed prematurely after " << totalRead << " bytes; failing request\n";
-			//printf("String buffer so far:\n%s\n", requestBuffer);
 			free(requestBuffer);
 			return NULL; // incomplete request, don't service
 		}
 		totalRead += readNow;
 	}
-	//std::cout << "Read " << totalRead << " bytes from client request body\n";
 	return requestBuffer;
 }
 
@@ -124,10 +112,8 @@ void respond(int connfd, const char* responseStr, int responseStrLen) {
 		std::cout << "Did not finish writing response\n";
 	}
 	else {
-		//std::cout << "Successfully returned response\n";
 	}
 }
-
 
 void serviceRequest(int connfd) {
 	bankRequestParser parser;
@@ -143,12 +129,6 @@ void serviceRequest(int connfd) {
 			respond(connfd, errorResponse.c_str(), (int)errorResponse.size());			    	
 	    }
 	    else { // creates, balances, transfers and queries for this request are all available now
-	    	/*
-		    std::vector<std::tuple<bool, std::string>> createResults = backend->createAccounts(parser.getCreateReqs());
-		    std::vector<std::tuple<float, std::string>> balanceResults = backend->getBalances(parser.getBalanceReqs());
-		    std::vector<std::tuple<int, std::string>> transferResults = backend->doTransfers(parser.getTransferReqs());
-		    std::vector<std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>> queryResults = backend->doQueries(parser.getQueryReqs());
-			*/
 		    clock_t start, end, t;
 		    std::vector<std::tuple<unsigned long, float, bool, std::string>> createReqs = parser.getCreateReqs();
 		    std::vector<std::tuple<unsigned long, std::string>> balanceReqs = parser.getBalanceReqs();
@@ -162,9 +142,6 @@ void serviceRequest(int connfd) {
 			std::vector<std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>> queryResults = backend->doQueries(queryReqs);
 			end = clock();
 			t = end - start;
-		    //std::cout << "Time elapsed on database/cache: " << t << " clicks; " << (((float)t)/CLOCKS_PER_SEC) << " secs\n";
-
-
 		    std::string successResponse = writer.constructResponse(&createResults, &balanceResults, &transferResults, &queryResults);
 		    respond(connfd, successResponse.c_str(), (int)successResponse.size());
 		}
@@ -177,16 +154,13 @@ void serviceRequest(int connfd) {
 		respond(connfd, errorResponse.c_str(), (int)errorResponse.size());
 	}
 	close(connfd);
-	//free(reqBuffer);
 }
+
 
 void cleanUp() {
 	std::cout << "Main thread about to clean up\n";
 	backend->cleanUp();
 	delete backend;
-	int totalServiced = pool->shutdown(); // Allow threadpool to reclaim its resources
-	std::cout << "Total requests serviced : " << totalServiced << "\n";
-	delete pool;
 	close(listenFd);
 	XMLPlatformUtils::Terminate();
 	exit(0);
@@ -200,6 +174,7 @@ void handleSignal(int num) {
 
 
 int main() {
+	std::cout << "Booyakasha C++!\n";
 	listenFd = bindAndListen(PORT, 10);
 	int connfd;
 	struct sockaddr_in cliaddr;
@@ -217,25 +192,51 @@ int main() {
         exit(1);
     }
     backend = new bankBackend(); // cache shared among threads
-    std::cout << "About to spawn threads\n";
-    pool = new threadPool(POOL_SIZE, &serviceRequest); // threads created and waiting for requests
+    bankRequestParser parser;
+    bankResponseWriter writer;
 	while(1) {
 		if ((connfd = accept(listenFd, (struct sockaddr *)&cliaddr, &len)) == -1) {
 			perror("Unable to accept connection");
   		}
 		else {
-			//std::cout << "Accepted connection on socket " << connfd << ", enqueueing on threadpool's queue\n";
-			pool->enqueueRequest(connfd); // Will be picked up by threads of pool
+			bankRequestParser parser;
+			bankResponseWriter writer;
+			std::string errorResponse = writer.getParseErrorResponse(); // should find a way to avoid repetition
+			char * reqBuffer;
+			if ((reqBuffer = readRequest(connfd))) {
+		// hand over to parser -> eventually either a separate thread, or a threadpool, etc
+				parser.initialize(reqBuffer, (unsigned long)strlen(reqBuffer));
+			    
+			    if (parser.parseRequest()) { // parser returned error while reading document
+			    	std::cout << "Unable to parse request, must be badly formed.\n";
+			    	// should return error xml
+					respond(connfd, errorResponse.c_str(), (int)errorResponse.size());			    	
+			    }
+	    		else { // creates, balances, transfers and queries for this request are all available now
+				    clock_t start, end, t;
+				    std::vector<std::tuple<unsigned long, float, bool, std::string>> createReqs = parser.getCreateReqs();
+				    std::vector<std::tuple<unsigned long, std::string>> balanceReqs = parser.getBalanceReqs();
+				    std::vector<std::tuple<unsigned long, unsigned long, float, std::string, std::vector<std::string>>> transferReqs = parser.getTransferReqs();
+				    std::vector<std::tuple<std::string, std::string>> queryReqs = parser.getQueryReqs();
+
+					start = clock();
+				    std::vector<std::tuple<bool, std::string>> createResults = backend->createAccounts(createReqs);
+					std::vector<std::tuple<float, std::string>> balanceResults = backend->getBalances(balanceReqs);
+					std::vector<std::tuple<int, std::string>> transferResults = backend->doTransfers(transferReqs);
+					std::vector<std::tuple<bool, std::string, std::vector<std::tuple<unsigned long, unsigned long, float, std::vector<std::string>>>>> queryResults = backend->doQueries(queryReqs);
+					end = clock();
+					t = end - start;
+				    std::string successResponse = writer.constructResponse(&createResults, &balanceResults, &transferResults, &queryResults);
+				    respond(connfd, successResponse.c_str(), (int)successResponse.size());
+				}
+		    	parser.cleanUp(); // done with request, clean up all XMLParsing resources
+				free(reqBuffer);
+			}
+			else { // bad request
+				respond(connfd, errorResponse.c_str(), (int)errorResponse.size());
+			}
+		close(connfd);
 		}
 	}
-	/*
-	backend->cleanUp();
-	delete backend;
-	int totalServiced = pool->shutdown();
-	std::cout << "Total requests serviced : " << totalServiced;
-	delete pool;
-	close(listenFd);
-	XMLPlatformUtils::Terminate();
-	*/
 	exit(1);
 }

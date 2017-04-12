@@ -47,7 +47,7 @@
 				// execute func
 				task(requestFd);
 				threadServiced ++;
-				std::cout << "Thread " << std::this_thread::get_id() << " has now serviced " << threadServiced << " requests\n";
+				//std::cout << "Thread " << std::this_thread::get_id() << " has now serviced " << threadServiced << " requests\n";
 			}
 			else {
 				std::cout << "Thread awakened to exit\n";

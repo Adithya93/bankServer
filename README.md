@@ -1,6 +1,10 @@
-C++ Server that reads XML requests and returns XML responses, with multi-threading, non-blocking I/O and in-memory cache for scalability. Uses REDIS and MongoDB databases for persistence
+C++ Server that reads XML requests and returns XML responses, with multi-threading (threadpool) and in-memory cache for scalability. Uses PostgreSQL database for persistence
 
-TO COMPILE: g++ -o server server.cc bankRequestParser.cc bankBackend.cc bankDBHandler.cc bankResponseWriter.cc queryNode.cc threadPool.cc -std=c++11 -lxerces-c -lpqxx -lpq
+TO COMPILE: Simply enter 'make'
+To RUN SINGLE-THREADED SERVER : ./bank-st
+TO RUN MULTI-THREADED SERVER : ./bank-mt
+TO RUN FUNCTIONAL TEST SUITE : python3 tests/func_test.py "<hostname>"
+TO RUN LOAD-TEST : python3 tests/load_test.py "<hostname>"
 
 To Kill Server Gracefully : Ctrl-C will cause the server to shutdown orderly and report metrics
 

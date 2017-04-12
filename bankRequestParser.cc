@@ -101,7 +101,7 @@ using namespace xercesc;
       else {
         reset = false;
       }
-      std::cout << "Verified parse validity!\n";
+      //std::cout << "Verified parse validity!\n";
       return 0;
     }
   }
@@ -279,14 +279,14 @@ using namespace xercesc;
 
 
   int bankRequestParser::parseQueryReqs() {
-    std::cout << "About to parse query requests!\n";
+    //std::cout << "About to parse query requests!\n";
     DOMNodeList* queries = root->getElementsByTagName(XMLString::transcode("query"));
     //printf("No. of queries: %lu\n", queries->getLength());
     //iterate through DOMNodes
     std::vector<std::tuple<std::string, std::string>> queryReqsVec;
     int hasError = 0;
-    std::cout << "No. of queries: " << queries->getLength();
-    std::cout << "About to iterate through queries\n";
+    //std::cout << "No. of queries: " << queries->getLength();
+    //std::cout << "About to iterate through queries\n";
     for (int i = 0; i < queries->getLength(); i ++) {
       std::string ref;
       DOMNode* child = queries->item(i);
@@ -308,7 +308,7 @@ using namespace xercesc;
       //if (actualCount > 1) {
       if (actuals.size() > 1) {
         //std::cout << "No. of top-level children of query: " << grandchildren->getLength() << "; implicit AND detected\n";
-        std::cout << "No. of top-level children of query: " << actuals.size() << "; implicit AND detected\n";
+        //std::cout << "No. of top-level children of query: " << actuals.size() << "; implicit AND detected\n";
         
         root = new queryNode('a');
         //for (int childNodeNum = 0; childNodeNum < grandchildren->getLength(); childNodeNum ++) {
@@ -321,7 +321,7 @@ using namespace xercesc;
         */
           DOMNode* grandchild = *it;
           //std::cout << "Testing Node name: " << XMLString::transcode(grandchildren->item(childNodeNum)->getNodeName()) << "\n";
-          std::cout << "Testing Node name: " << XMLString::transcode(grandchild->getNodeName()) << "\n";
+          //std::cout << "Testing Node name: " << XMLString::transcode(grandchild->getNodeName()) << "\n";
           //queryNode* rootChild = parseQueryNode(grandchildren->item(childNodeNum));
           queryNode* rootChild = parseQueryNode(grandchild);
           if (!rootChild) {
@@ -344,19 +344,19 @@ using namespace xercesc;
       }
       
       else { // get tag name of top-level tag within query
-        std::cout << "Exactly 1 top-level operator for this query\n";
+        //std::cout << "Exactly 1 top-level operator for this query\n";
         //root = parseQueryNode(grandchildren->item(0));
         root = parseQueryNode(actuals.front());
       }
       std::string queryString;
       if (!root) {
-        std::cout << "Query " << i << " of ref " << ref << " is invalid\n";
+        //std::cout << "Query " << i << " of ref " << ref << " is invalid\n";
         queryString = "";
         hasError = 1;
       }
       else {
         queryString = root->getQueryString();
-        std::cout << "Query String for query number " << i << " of ref " << ref << " is " << queryString << "\n";
+        //std::cout << "Query String for query number " << i << " of ref " << ref << " is " << queryString << "\n";
         deleteQueryNodes(root);
       }
       queryReqsVec.push_back(std::tuple<std::string, std::string>(queryString, ref));      
@@ -380,14 +380,13 @@ using namespace xercesc;
         rel = 'o';
       }
       else if (strcmp(nodeName, "not") == 0) {
-        std::cout << "Now parsing a NOT node\n";
         rel = 'n';
       }
       else { // relational operator - Base-Case : No child nodes
         
         DOMNamedNodeMap * attrs = domNode->getAttributes();
         if (attrs->getLength() != 1) {
-          std::cout << "Wrong number of attributes in query relational operator: " << attrs->getLength() << "\n";
+          //std::cout << "Wrong number of attributes in query relational operator: " << attrs->getLength() << "\n";
           // can flag this query as invalid and move on to next query
           return NULL;
         }
@@ -424,7 +423,7 @@ using namespace xercesc;
           return NULL;
         }
         q = new queryNode(rel, val, attr);
-        std::cout << "Adding simple node with query " << q->getQueryString() << "\n";
+        //std::cout << "Adding simple node with query " << q->getQueryString() << "\n";
         return q;
     }
       // logical operator: add children, and if any child invalid, invalidate entire query tree
@@ -443,9 +442,6 @@ using namespace xercesc;
           }
           q->addChild(childQueryNode);
         }
-      }
-      else {
-        std::cout << "Children is null!\n";
       }
       return q;
   }
