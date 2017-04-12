@@ -3,7 +3,7 @@ import urllib.request
 import socket
 import sys
 import random
-#import xml.etree.ElementTree as ET
+import time
 import func_test_xml_helper as xml_helper
 
 
@@ -13,9 +13,22 @@ MAX_ACCOUNT_NUM = 999999
 MAX_REF_VAL = 99999
 MAX_BALANCE_VAL = 999999
 TAG_PROBABILITY = 0.5
-SMALL_TRANSFER_LIMIT = 500000
-LARGE_TRANSFER_LIMIT = 105
+#SMALL_TRANSFER_LIMIT = 500000
+
+#LARGE_TRANSFER_LIMIT = 105
 LARGE_TRANSFER_LOWER_LIMIT = 100
+
+FUNC_TEST_LOWER_LIMIT = 500000
+FUNC_TEST_UPPER_LIMIT = 50000
+
+LOAD_TEST_LOWER_LIMIT = 999000
+LOAD_TEST_UPPER_LIMIT = 1000
+
+FUNC_TEST_OR_TUP = (600000, 900000, 200000)
+FUNC_TEST_AND_TUP = (300000, 900000, 999999)
+
+LOAD_TEST_OR_TUP = (999000, 1000, 5000)
+LOAD_TEST_AND_TUP = (800000, 10000, 20000)
 
 # Tests to run
 
@@ -39,7 +52,7 @@ LARGE_TRANSFER_LOWER_LIMIT = 100
 
 ## QUERY
 # Simple relational operator <DONE>
-# Simple logical operator
+# Simple logical operator <DONE>
 # Nested Operator
 # Empty NOT returns empty set <DONE>
 # Empty OR returns empty set <DONE>
@@ -159,15 +172,15 @@ def get_create_responses(res, numReqs, use_old = None, old_accs = None):
     body = wrapBody(createReqStr, res)
     print("Entire request: ")
     print(body)
-    createResults = sendRequest(body)
-    return (createResults, accounts) # tuple of (response string, map of refs to (account, balance))
+    createResults, latency = sendRequest(body)
+    return (createResults, accounts, latency) # tuple of (response string, map of refs to (account, balance))
 
 # Make create reqs, wait for the response, then make balance reqs, and 
 def test_create_balance(res, numReqs):
-    createResults, accounts = get_create_responses(res, numReqs)
+    createResults, accounts, create_latency = get_create_responses(res, numReqs)
     print("About to verify creation with balance requests")
     balanceRequest = genBalanceReqs(accounts)
-    balanceResults = sendRequest(balanceRequest)
+    balanceResults, latency = sendRequest(balanceRequest)
     balanceResultsString = balanceResults
     print("Balance results: ")
     print(balanceResultsString)
@@ -179,13 +192,13 @@ def test_create_balance(res, numReqs):
     print("Completed test of CREATE & BALANCE with " + str(failures) + " failures out of " + str(numReqs) + " creates and balances")
     if failures == 0:
         print("UNIT TEST PASSED! :)")
-    return failures == 0
+    return (failures == 0, latency) #returns balance latency
 
 
 def test_create_no_reset_fails(numReqs):
-    createResults, accounts_map = get_create_responses(True, numReqs)
+    createResults, accounts_map, create_latency = get_create_responses(True, numReqs)
     # repeat with same accounts, but with reset set to False; all requests must return <error>Already exists</error> (Text doesn't matter, tag does)
-    repeatResults, same_accounts_map = get_create_responses(False, numReqs, accounts_map)
+    repeatResults, same_accounts_map, create_latency_2 = get_create_responses(False, numReqs, accounts_map)
     # search repeatResults for error tags
     print("First map: ", accounts_map)
     print("Second map: ", same_accounts_map)
@@ -194,13 +207,13 @@ def test_create_no_reset_fails(numReqs):
     print("Completed test of repeated CREATE with no reset with " + str(failures) + " failures out of " + str(numReqs) + " creates")
     if failures == 0:
         print("UNIT TEST PASSED! :)")
-    return failures == 0
+    return (failures == 0, (create_latency + create_latency_2)/2) #returns create latency
 
 
 def transfer_insufficient_funds(numReqs, forFrom):
     # create accounts, retrieve map
-    createResults, accounts_map = get_create_responses(True, numReqs)
-    otherCreateResults, other_accounts_map = get_create_responses(True, numReqs, None, list(map(lambda x : accounts_map[x][0], accounts_map.keys())))
+    createResults, accounts_map, create_latency = get_create_responses(True, numReqs)
+    otherCreateResults, other_accounts_map, create_latency_2 = get_create_responses(True, numReqs, None, list(map(lambda x : accounts_map[x][0], accounts_map.keys())))
     # for each (account, balance) make a transfer from account of balance + 5 (Won't overflow cos of cautious limit on MAX_BALANCE_VAL)
     opsList = []
     refs = set([])
@@ -219,26 +232,26 @@ def transfer_insufficient_funds(numReqs, forFrom):
     body = wrapBody(transferReqsStr, False)
     print("Entire request: ")
     print(body)
-    transferResults = sendRequest(body)
+    transferResults, latency = sendRequest(body)
     print("Transfer results: ")
     print(transferResults)
     root = parseResponse(transferResults)
     testFailures = verifyTransferFailures(root, numReqs) # just searches for this many <error> tags
     if testFailures == 0:
         print("UNIT TEST PASSED! :)")
-    return testFailures == 0
+    return (testFailures == 0, latency) #returns transfer latency
 
 def test_transfer_insufficient_funds_from_fails(numReqs):
-    return transfer_insufficient_funds(numReqs, True)
+    return transfer_insufficient_funds(numReqs, True) # returns transfer latency
 
 def test_transfer_insufficient_funds_to_fails(numReqs):
-    return transfer_insufficient_funds(numReqs, False)
+    return transfer_insufficient_funds(numReqs, False) # returns transfer latency
 
 # helper for below 2 functions
 def transfer_valid(numReqs):
     # create 2 sets of accounts
-    createResults, accounts_map = get_create_responses(True, numReqs)
-    otherCreateResults, other_accounts_map = get_create_responses(True, numReqs, None, list(map(lambda x : accounts_map[x][0], accounts_map.keys())))
+    createResults, accounts_map, create_latency = get_create_responses(True, numReqs)
+    otherCreateResults, other_accounts_map, create_latency_2 = get_create_responses(True, numReqs, None, list(map(lambda x : accounts_map[x][0], accounts_map.keys())))
     # transfer exactly the amount one has to the other
     # for each (account, balance) make a transfer from account of balance + 5 (Won't overflow cos of cautious limit on MAX_BALANCE_VAL)
     opsList = []
@@ -259,25 +272,25 @@ def transfer_valid(numReqs):
     body = wrapBody(transferReqsStr, False)
     print("Entire request: ")
     print(body)
-    transferResults = sendRequest(body)
+    transferResults, latency = sendRequest(body)
     print("Transfer results: ")
     print(transferResults)
     root = parseResponse(transferResults)
     failures = verifyTransferSuccesses(root, numReqs) # just searches for this many <error> tags
-    return (failures, exp_balances_from, exp_balances_to)
+    return (failures, exp_balances_from, exp_balances_to, latency)
 
 def test_transfer_valid_success(numReqs):
-    failures = transfer_valid(numReqs)[0]
+    failures, exp_balances_from, exp_balances_to, latency = transfer_valid(numReqs)#[0]
     if failures == 0:
         print("UNIT TEST PASSED! :)")
-    return failures == 0
+    return (failures == 0, latency) # returns transfer latency
 
 def transfer_valid_balance(numReqs, forFrom):
-    failures, exp_balances_from, exp_balances_to = transfer_valid(numReqs)
+    failures, exp_balances_from, exp_balances_to, transfer_latency = transfer_valid(numReqs)
     # get balances of all FROM accounts and verify correct 
     balanceRequest = genBalanceReqs(exp_balances_from) if forFrom else genBalanceReqs(exp_balances_to)
     chosen_map = exp_balances_from if forFrom else exp_balances_to
-    balanceResults = sendRequest(balanceRequest)
+    balanceResults, balance_latency = sendRequest(balanceRequest)
     print("Balance results: ")
     print(balanceResults)
     # call function which parses xml to return map of account to balance
@@ -285,77 +298,79 @@ def transfer_valid_balance(numReqs, forFrom):
     failures = verifyBalances(chosen_map, response_xml_root)
     if failures == 0:
         print("UNIT TEST PASSED! :)")
-    return failures == 0
+    return (failures == 0, balance_latency) # returns balance latency
 
 def test_transfer_valid_balance_from(numReqs):
-    return transfer_valid_balance(numReqs, True)
+    return transfer_valid_balance(numReqs, True) # returns balance latency
 
 
 def test_transfer_valid_balance_to(numReqs):
-    return transfer_valid_balance(numReqs, False)
+    return transfer_valid_balance(numReqs, False) # returns balance latency
 
 def test_query_empty_not():
     empty_not_query_str = wrapQuery(makeNotQueryOp(""), genRef(set([])))
     body = wrapBody(empty_not_query_str, False)
     print("Query request: ")
     print(body)
-    queryResults = sendRequest(body)
+    queryResults, latency = sendRequest(body)
     print("Query results: ")
     print(queryResults)
     root = parseResponse(queryResults)
     success = verifyEmptyResult(root)
     if success:
         print("UNIT TEST PASSED! :)")
-    return success
+    return (success, latency) # returns query latency
 
 def test_query_empty_or():
     empty_or_query_str = wrapQuery(makeOrQueryOp(["", ""]), genRef(set([])))
     body = wrapBody(empty_or_query_str, False)
     print("Query request: ")
     print("body")
-    queryResults = sendRequest(body)
+    queryResults, latency = sendRequest(body)
     print("Query results: ")
     print(queryResults)
     root = parseResponse(queryResults)
     success = verifyEmptyResult(root)
     if success:
         print("UNIT TEST PASSED! :)")
-    return success
+    return (success, latency) # returns query latency
 
-def test_query_relational_greater():
+def test_query_relational_greater(lower_limit):
     # choose a random amount, and check result to ensure all transfers fulfill criteria
-    transferAmount = random.randrange(SMALL_TRANSFER_LIMIT, 2 * SMALL_TRANSFER_LIMIT)
+    #transferAmount = random.randrange(SMALL_TRANSFER_LIMIT, 2 * SMALL_TRANSFER_LIMIT)
+    transferAmount = random.randrange(lower_limit, 2 * lower_limit)
     greater_query_str = wrapQuery(makeGreaterQueryOp("amount", transferAmount), genRef(set([])))
     body = wrapBody(greater_query_str, False)
     print("Query request: ")
     print("body")
-    queryResults = sendRequest(body)
+    queryResults, latency = sendRequest(body)
     print("Query results: ")
     print(queryResults)
     root = parseResponse(queryResults)
     success = verifyGreaterAttr(root, "amount", transferAmount)
     if success:
         print("UNIT TEST PASSED! :)")
-    return success
+    return (success, latency) # returns query latency
 
-def test_query_relational_less():
-    transferAmount = random.randrange(LARGE_TRANSFER_LOWER_LIMIT, LARGE_TRANSFER_LIMIT)
+def test_query_relational_less(upper_limit):
+    #transferAmount = random.randrange(LARGE_TRANSFER_LOWER_LIMIT, LARGE_TRANSFER_LIMIT)
+    transferAmount = random.randrange(0, upper_limit)
     less_query_str = wrapQuery(makeLesserQueryOp("amount", transferAmount), genRef(set([])))
     body = wrapBody(less_query_str, False)
     print("Query request: ")
     print(body)
-    queryResults = sendRequest(body)
+    queryResults, latency = sendRequest(body)
     print("Query results: ")
     print(queryResults)
     root = parseResponse(queryResults)
     success = verifyLesserAttr(root, "amount", transferAmount)
     if success:
         print("UNIT TEST PASSED! :)")
-    return success
+    return (success, latency) # returns query latency
 
 def test_query_relational_equal():
     # Make a new transfer with a known FROM account to make sure it exists
-    failures, exp_balances_from, exp_balances_to = transfer_valid(1)
+    failures, exp_balances_from, exp_balances_to, transfer_latency = transfer_valid(1)
     account_from = exp_balances_from[list(exp_balances_from.keys())[0]][0]
     print("Account from: " + str(account_from))
     # Make query on equals
@@ -363,14 +378,14 @@ def test_query_relational_equal():
     body = wrapBody(equal_query_str, False)
     print("Query request: ")
     print(body)
-    queryResults = sendRequest(body)
+    queryResults, latency = sendRequest(body)
     print("Query results: ")
     print(queryResults)
     root = parseResponse(queryResults)
     success = verifyEqualAttr(root, "from", account_from)
     if success:
         print("UNIT TEST PASSED! :)")
-    return success
+    return (success, latency) # returns query latency
 
 def test_query_logical_or(condList):
     queryList = []
@@ -385,14 +400,14 @@ def test_query_logical_or(condList):
     body = wrapBody(or_query_str, False)
     print("Or Query Request: ")
     print(body)
-    queryResults = sendRequest(body)
+    queryResults, latency = sendRequest(body)
     print("Query Results:")
     print(queryResults)
     root = parseResponse(queryResults)
     success = verifyOr(root, condList)
     if success:
         print("UNIT TEST PASSED! :)")
-    return success
+    return (success, latency) # returns query latency
 
 def test_query_logical_and(condList):
     queryList = []
@@ -407,24 +422,24 @@ def test_query_logical_and(condList):
     body = wrapBody(and_query_str, False)
     print("Or Query Request: ")
     print(body)
-    queryResults = sendRequest(body)
+    queryResults, latency = sendRequest(body)
     print("Query Results:")
     print(queryResults)
     root = parseResponse(queryResults)
     success = verifyAnd(root, condList)
     if success:
         print("UNIT TEST PASSED! :)")
-    return success
+    return (success, latency) # returns query latency
 
 # Come up with more robust/flexible way to test : possible if query class is written (if there is time)
-def test_query_logical_not():
-    transferAmount = random.randrange(LARGE_TRANSFER_LOWER_LIMIT, LARGE_TRANSFER_LIMIT)
+def test_query_logical_not(lower_limit):
+    transferAmount = random.randrange(lower_limit, 2 * lower_limit)
     less_query_str = makeLesserQueryOp("amount", transferAmount)
     not_query_str = wrapQuery(makeNotQueryOp(less_query_str), genRef(set([])))
     body = wrapBody(not_query_str, False)
     print("Query request: ")
     print(body)
-    queryResults = sendRequest(body)
+    queryResults, latency = sendRequest(body)
     print("Query results: ")
     print(queryResults)
     root = parseResponse(queryResults)
@@ -433,7 +448,7 @@ def test_query_logical_not():
         print("UNIT TEST PASSED! :)")
     else:
         print("UNIT TEST FAILED! :(")
-    return success
+    return (success, latency) # returns query latency
 
 def parseResponse(response):
     return xml_helper.parse(response)
@@ -486,39 +501,69 @@ def verifyBalance(exp_value, root, ref):
 def verifyBalances(expected_accounts_map, response_root):
     return [verifyBalance(expected_accounts_map[ref][1], response_root, ref) for ref in expected_accounts_map].count(False)
     
-def run_tests(numReqs):
+def run_tests(host, numReqs=10, load_test=False):
+    lower_limit = None
+    upper_limit = None
+    or_tup = None
+    and_tup = None
+    if load_test :
+        lower_limit = LOAD_TEST_LOWER_LIMIT
+        upper_limit = LOAD_TEST_UPPER_LIMIT
+        or_tup = LOAD_TEST_OR_TUP
+        and_tup = LOAD_TEST_AND_TUP
+
+    else :
+        lower_limit = FUNC_TEST_LOWER_LIMIT
+        upper_limit = FUNC_TEST_UPPER_LIMIT
+        or_tup = FUNC_TEST_OR_TUP
+        and_tup = FUNC_TEST_AND_TUP
+
+    HOST = host
     results = []
-    results.append(test_create_balance(reset, numReqs))
-    results.append(test_create_no_reset_fails(numReqs))
-    results.append(test_transfer_insufficient_funds_from_fails(numReqs))
-    results.append(test_transfer_insufficient_funds_to_fails(numReqs))
-    results.append(test_transfer_valid_success(numReqs))
-    results.append(test_transfer_valid_balance_from(numReqs))
-    results.append(test_transfer_valid_balance_to(numReqs))
-    results.append(test_query_empty_not())
-    results.append(test_query_empty_or())
-    results.append(test_query_relational_greater())
-    results.append(test_query_relational_less())
-    results.append(test_query_relational_equal())
-    results.append(test_query_logical_or([("amount", "greater", 631000), ("amount", "less", 800000), ("to", "less", 166000)]))
-    results.append(test_query_logical_and([("amount", "greater", 400000), ("amount", "less", 800000), ("to", "less", 999999)]))
-    results.append(test_query_logical_not())
-    successes = results.count(True)
+    results.append(test_create_balance(True, numReqs)) # balance latency for numReqs
+    results.append(test_create_no_reset_fails(numReqs)) # create latency for numReqs
+    results.append(test_transfer_insufficient_funds_from_fails(numReqs)) # transfer latency for numReqs
+    results.append(test_transfer_insufficient_funds_to_fails(numReqs)) # transfer latency for numReqs
+    results.append(test_transfer_valid_success(numReqs)) # transfer latency for numReqs
+    results.append(test_transfer_valid_balance_from(numReqs)) # balance latency for numReqs
+    results.append(test_transfer_valid_balance_to(numReqs)) # balance latency for numReqs
+    results.append(test_query_empty_not()) # query latency for 1 req
+    results.append(test_query_empty_or()) # query latency for 1 req
+    results.append(test_query_relational_greater(lower_limit)) # query latency for 1 req
+    results.append(test_query_relational_less(upper_limit)) # query latency for 1 req
+    results.append(test_query_relational_equal()) # query latency for 1 req
+    results.append(test_query_logical_or([("amount", "greater", or_tup[0]), ("amount", "less", or_tup[1]), ("to", "less", or_tup[2])])) # query latency for 1 req
+    results.append(test_query_logical_and([("amount", "greater", and_tup[0]), ("amount", "less", and_tup[1]), ("to", "less", and_tup[2])])) # query latency for 1 req
+    results.append(test_query_logical_not(lower_limit)) # query latency for 1 req
+    successes = list(map(lambda x : x[0], results)).count(True)
+    timings = list(map(lambda x: x[1], results))
+    avg_create_latency = (timings[1])/numReqs
+    avg_balance_latency = (timings[0] + timings[5] + timings[6])/(3 * numReqs)
+    avg_transfer_latency = (timings[2] + timings[3] + timings[4])/(3 * numReqs)
+    avg_query_latency = sum(timings[i] for i in range(7, len(timings)))/((len(timings) - 7) * numReqs)
+    timings_tup = (avg_create_latency, avg_balance_latency, avg_transfer_latency, avg_query_latency)
+    #timings_list = [1000 * timings_tup[i] for i in range(len(timings_tup))]
+    timings_list = list(map(lambda x : x * 1000, timings_tup))
+    print("Average Timings: CREATE: " + str(timings_list[0]) + "ms; BALANCE: " + str(timings_list[1]) + "ms; TRANSFER: " + str(timings_list[2]) + "ms; QUERY: " + str(timings_list[3]) + "ms")
     failures = results.count(False)
     print("COMPLETED " + str(len(results)) + " TESTS WITH " + str(successes) + " SUCCESSES and " + str(failures) + " FAILURES.")
-
+    return timings_list
 
 def sendRequest(body):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((HOST, PORT))
         s.sendall(addHeader(body))
-        data = s.recv(16384)
+        # start timing
+        start_time = time.time()
+        data = s.recv(131072)
+        end_time = time.time()
+        # stop timing
     response = repr(data)
     print('Received', response)
-    return bytes.decode(data)
+    return (bytes.decode(data), end_time - start_time)
 
 if __name__ == "__main__":
-    numReqs = 100
+    numReqs = 10
     reset = True
     if len(sys.argv) < 2:
         print("Usage: python3 func_test.py <hostname> [numReqs=100] [reset=True]")
@@ -528,5 +573,5 @@ if __name__ == "__main__":
         numReqs = int(sys.argv[2])
         if len(sys.argv) > 3:
             reset = True if sys.argv[3].lower() == 't' else False
-    run_tests(numReqs)
+    run_tests(HOST, numReqs)
 
